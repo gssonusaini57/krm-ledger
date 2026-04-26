@@ -58,19 +58,15 @@ function MainApp() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  // ── Balance & month stats ─────────────────────────────────────────────────
+  // ── Balance & today stats (owner transactions excluded) ───────────────────
   const balance = getCompanyBalance()
 
-  const { monthIn, monthOut } = useMemo(() => {
-    const now = new Date()
-    const m = now.getMonth(), y = now.getFullYear()
-    const mo = transactions.filter(t => {
-      const d = new Date(t.date)
-      return d.getMonth() === m && d.getFullYear() === y
-    })
+  const { todayIn, todayOut } = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const todayTxns = transactions.filter(t => t.date === today)
     return {
-      monthIn:  mo.filter(t => isInflow(t.type)).reduce((s, t) => s + t.amount, 0),
-      monthOut: mo.filter(t => !isInflow(t.type)).reduce((s, t) => s + t.amount, 0),
+      todayIn:  todayTxns.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0),
+      todayOut: todayTxns.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0),
     }
   }, [transactions])
 
@@ -143,25 +139,25 @@ function MainApp() {
             </p>
           </div>
 
-          {/* Month stats */}
+          {/* Today stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl p-3.5" style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)' }}>
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                   <ArrowUpRight size={11} color="#10B981" />
                 </div>
-                <p className="text-slate-400 text-xs">This Month In</p>
+                <p className="text-slate-400 text-xs">Aaj Aaya</p>
               </div>
-              <p className="text-emerald-400 font-bold text-xl">{formatCurrency(monthIn, settings.currency)}</p>
+              <p className="text-emerald-400 font-bold text-xl">{formatCurrency(todayIn, settings.currency)}</p>
             </div>
             <div className="rounded-2xl p-3.5" style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)' }}>
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="w-5 h-5 rounded-full bg-rose-500/20 flex items-center justify-center">
                   <ArrowDownRight size={11} color="#F43F5E" />
                 </div>
-                <p className="text-slate-400 text-xs">This Month Out</p>
+                <p className="text-slate-400 text-xs">Aaj Gaya</p>
               </div>
-              <p className="text-rose-400 font-bold text-xl">{formatCurrency(monthOut, settings.currency)}</p>
+              <p className="text-rose-400 font-bold text-xl">{formatCurrency(todayOut, settings.currency)}</p>
             </div>
           </div>
         </div>

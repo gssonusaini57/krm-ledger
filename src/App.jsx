@@ -113,21 +113,24 @@ function MainApp() {
 
         <div className="relative px-6 pt-6 pb-6">
           {/* Top row */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F59E0B' }}>
-                <Wheat size={18} color="#0F172A" />
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm leading-tight">{settings.companyName}</p>
-                <p className="text-slate-400 text-xs">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
-              </div>
-            </div>
+          <div className="relative flex items-center justify-center mb-6">
             <button onClick={() => setShowSettings(true)}
-              className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+              className="absolute right-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
               style={{ background: 'rgba(255,255,255,0.08)' }}>
               <Settings size={16} color="rgba(255,255,255,0.7)" />
             </button>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
+                style={{ background: 'linear-gradient(135deg, #F59E0B, #F97316)', boxShadow: '0 4px 16px rgba(245,158,11,0.35)' }}>
+                <Wheat size={26} color="#0F172A" />
+              </div>
+              <div className="text-center">
+                <p className="text-white font-extrabold tracking-wide" style={{ fontSize: 22, letterSpacing: 1 }}>
+                  {settings.companyName}
+                </p>
+                <p className="text-slate-400 text-xs mt-0.5">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
+              </div>
+            </div>
           </div>
 
           {/* Balance */}

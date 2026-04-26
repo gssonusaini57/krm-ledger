@@ -146,7 +146,7 @@ function MainApp() {
                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                   <ArrowUpRight size={11} color="#10B981" />
                 </div>
-                <p className="text-slate-400 text-xs">Aaj Aaya</p>
+                <p className="text-slate-400 text-xs">Aaj Ki Kamai</p>
               </div>
               <p className="text-emerald-400 font-bold text-xl">{formatCurrency(todayIn, settings.currency)}</p>
             </div>
@@ -155,7 +155,7 @@ function MainApp() {
                 <div className="w-5 h-5 rounded-full bg-rose-500/20 flex items-center justify-center">
                   <ArrowDownRight size={11} color="#F43F5E" />
                 </div>
-                <p className="text-slate-400 text-xs">Aaj Gaya</p>
+                <p className="text-slate-400 text-xs">Aaj Ka Kharcha</p>
               </div>
               <p className="text-rose-400 font-bold text-xl">{formatCurrency(todayOut, settings.currency)}</p>
             </div>

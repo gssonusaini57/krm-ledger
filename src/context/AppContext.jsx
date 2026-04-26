@@ -1,6 +1,10 @@
-import { createContext, useContext, useReducer, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { isInflow, isOutflow, TRANSACTION_TYPES } from '../utils/helpers'
+import {
+  collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc
+} from 'firebase/firestore'
+import { db } from '../firebase'
+import { isInflow, TRANSACTION_TYPES } from '../utils/helpers'
 
 const AppContext = createContext()
 
@@ -16,87 +20,102 @@ const DEFAULT_SETTINGS = {
   openingBalance: 0,
 }
 
-function buildInitialState() {
-  return {
-    owners: DEFAULT_OWNERS,
-    transactions: [],
-    employees: [],
-    settings: DEFAULT_SETTINGS,
-  }
-}
-
-function reducer(state, action) {
-  switch (action.type) {
-    case 'ADD_TRANSACTION':
-      return { ...state, transactions: [action.payload, ...state.transactions] }
-    case 'UPDATE_TRANSACTION':
-      return {
-        ...state,
-        transactions: state.transactions.map(t =>
-          t.id === action.payload.id ? action.payload : t
-        ),
-      }
-    case 'DELETE_TRANSACTION':
-      return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) }
-    case 'UPDATE_OWNER':
-      return { ...state, owners: state.owners.map(o => (o.id === action.payload.id ? action.payload : o)) }
-    case 'UPDATE_SETTINGS':
-      return { ...state, settings: { ...state.settings, ...action.payload } }
-    case 'ADD_EMPLOYEE':
-      return { ...state, employees: [...(state.employees || []), action.payload] }
-    case 'UPDATE_EMPLOYEE':
-      return { ...state, employees: (state.employees || []).map(e => e.id === action.payload.id ? action.payload : e) }
-    case 'DELETE_EMPLOYEE':
-      return { ...state, employees: (state.employees || []).filter(e => e.id !== action.payload) }
-    default:
-      return state
-  }
-}
-
-function loadState() {
-  try {
-    localStorage.removeItem('krm-ledger-v1') // clear old seed data
-    const raw = localStorage.getItem('krm-ledger-v2')
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return buildInitialState()
-}
-
 export function AppProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState)
+  const [owners, setOwners]           = useState(DEFAULT_OWNERS)
+  const [settings, setSettings]       = useState(DEFAULT_SETTINGS)
+  const [employees, setEmployees]     = useState([])
+  const [transactions, setTransactions] = useState([])
+  const [loading, setLoading]         = useState(true)
 
+  // Listen to config (owners, settings, employees)
   useEffect(() => {
-    localStorage.setItem('krm-ledger-v2', JSON.stringify(state))
-  }, [state])
+    const configRef = doc(db, 'config', 'main')
+    const unsub = onSnapshot(configRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data()
+        if (data.owners)    setOwners(data.owners)
+        if (data.settings)  setSettings(data.settings)
+        if (data.employees) setEmployees(data.employees)
+      } else {
+        setDoc(configRef, {
+          owners: DEFAULT_OWNERS,
+          settings: DEFAULT_SETTINGS,
+          employees: [],
+        })
+      }
+    })
+    return () => unsub()
+  }, [])
 
-  const addTransaction = data =>
-    dispatch({ type: 'ADD_TRANSACTION', payload: { ...data, id: uuidv4(), createdAt: new Date().toISOString() } })
+  // Listen to transactions
+  useEffect(() => {
+    const txnsRef = collection(db, 'transactions')
+    const unsub = onSnapshot(txnsRef, (snap) => {
+      const txns = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setTransactions(txns)
+      setLoading(false)
+    })
+    return () => unsub()
+  }, [])
 
-  const updateTransaction = data => dispatch({ type: 'UPDATE_TRANSACTION', payload: data })
-  const deleteTransaction = id => dispatch({ type: 'DELETE_TRANSACTION', payload: id })
-  const updateOwner    = data => dispatch({ type: 'UPDATE_OWNER', payload: data })
-  const updateSettings = data => dispatch({ type: 'UPDATE_SETTINGS', payload: data })
-  const addEmployee    = data => dispatch({ type: 'ADD_EMPLOYEE', payload: { ...data, id: uuidv4() } })
-  const updateEmployee = data => dispatch({ type: 'UPDATE_EMPLOYEE', payload: data })
-  const deleteEmployee = id   => dispatch({ type: 'DELETE_EMPLOYEE', payload: id })
+  const updateConfig = (updates) =>
+    setDoc(doc(db, 'config', 'main'), updates, { merge: true })
 
-  const getCompanyBalance = (txns = state.transactions) => {
-    const opening = state.settings.openingBalance || 0
+  const addTransaction = (data) =>
+    addDoc(collection(db, 'transactions'), { ...data, createdAt: new Date().toISOString() })
+
+  const updateTransaction = ({ id, ...rest }) =>
+    updateDoc(doc(db, 'transactions', id), rest)
+
+  const deleteTransaction = (id) =>
+    deleteDoc(doc(db, 'transactions', id))
+
+  const updateOwner = (owner) => {
+    const newOwners = owners.map(o => o.id === owner.id ? owner : o)
+    setOwners(newOwners)
+    updateConfig({ owners: newOwners })
+  }
+
+  const updateSettings = (newSettings) => {
+    const merged = { ...settings, ...newSettings }
+    setSettings(merged)
+    updateConfig({ settings: merged })
+  }
+
+  const addEmployee = (emp) => {
+    const newEmps = [...employees, { ...emp, id: uuidv4() }]
+    setEmployees(newEmps)
+    updateConfig({ employees: newEmps })
+  }
+
+  const updateEmployee = (emp) => {
+    const newEmps = employees.map(e => e.id === emp.id ? emp : e)
+    setEmployees(newEmps)
+    updateConfig({ employees: newEmps })
+  }
+
+  const deleteEmployee = (id) => {
+    const newEmps = employees.filter(e => e.id !== id)
+    setEmployees(newEmps)
+    updateConfig({ employees: newEmps })
+  }
+
+  const getCompanyBalance = (txns = transactions) => {
+    const opening = settings.openingBalance || 0
     return txns.reduce((bal, t) => bal + (isInflow(t.type) ? t.amount : -t.amount), opening)
   }
 
-  const getOwnerBalance = ownerId => {
-    return state.transactions
+  const getOwnerBalance = (ownerId) =>
+    transactions
       .filter(t => t.ownerId === ownerId)
       .reduce((bal, t) => {
-        if (t.type === TRANSACTION_TYPES.OWNER_DEPOSIT) return bal + t.amount
+        if (t.type === TRANSACTION_TYPES.OWNER_DEPOSIT)    return bal + t.amount
         if (t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) return bal - t.amount
         return bal
       }, 0)
-  }
 
-  const getOwnerTransactions = ownerId =>
-    state.transactions.filter(t => t.ownerId === ownerId)
+  const getOwnerTransactions = (ownerId) =>
+    transactions.filter(t => t.ownerId === ownerId)
 
   const getTotals = (txns) => {
     let inflow = 0, outflow = 0
@@ -107,21 +126,27 @@ export function AppProvider({ children }) {
     return { inflow, outflow, net: inflow - outflow }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F1F5F9' }}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#F59E0B' }}>
+            <span className="text-3xl">🌾</span>
+          </div>
+          <p className="text-gray-600 font-semibold text-lg">KRM Ledger</p>
+          <p className="text-gray-400 text-sm mt-1">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <AppContext.Provider value={{
-      ...state,
-      addTransaction,
-      updateTransaction,
-      deleteTransaction,
-      updateOwner,
-      updateSettings,
-      addEmployee,
-      updateEmployee,
-      deleteEmployee,
-      getCompanyBalance,
-      getOwnerBalance,
-      getOwnerTransactions,
-      getTotals,
+      owners, transactions, employees, settings,
+      addTransaction, updateTransaction, deleteTransaction,
+      updateOwner, updateSettings,
+      addEmployee, updateEmployee, deleteEmployee,
+      getCompanyBalance, getOwnerBalance, getOwnerTransactions, getTotals,
     }}>
       {children}
     </AppContext.Provider>

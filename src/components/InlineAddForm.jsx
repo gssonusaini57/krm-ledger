@@ -14,6 +14,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const [ownerId, setOwnerId]         = useState(owners[0]?.id || '')
   const [ownerPaid, setOwnerPaid]     = useState(false)
   const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
+  const [employeeId, setEmployeeId]   = useState('')
   const [date, setDate]               = useState(todayISO())
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState(false)
@@ -24,7 +25,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
   const reset = () => {
     setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
-    setPayMode('CASH'); setDate(todayISO())
+    setPayMode('CASH'); setDate(todayISO()); setEmployeeId('')
   }
 
   const validate = () => {
@@ -46,7 +47,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setError('')
     const amt = validate(); if (!amt) return
     if (ownerPaid && !ownerPaidId) { setError('Select which partner paid'); return }
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null, employeeId: employeeId || null })
     if (ownerPaid && ownerPaidId) {
       addTransaction({
         date, amount: amt,
@@ -120,6 +121,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
                   onClick={() => {
                     setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
                     if (isSalary && emp.salary) setAmount(String(emp.salary))
+                    setEmployeeId(emp.id)
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
                   style={{ borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }}

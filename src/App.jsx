@@ -4,6 +4,7 @@ import InlineAddForm from './components/InlineAddForm'
 import TransactionForm from './components/TransactionForm'
 import SettingsModal from './components/SettingsModal'
 import PartnerDetail from './components/PartnerDetail'
+import EmployeeDetail from './components/EmployeeDetail'
 import {
   formatCurrency, isInflow, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
 } from './utils/helpers'
@@ -33,6 +34,7 @@ const NAV_MAIN = [
   { key: 'IN',    label: 'Cash In', icon: ArrowUpRight  },
   { key: 'OUT',   label: 'Cash Out',icon: ArrowDownRight},
   { key: 'OWNER', label: 'Partner', icon: Users         },
+  { key: 'STAFF', label: 'Staff',   icon: Briefcase     },
 ]
 const NAV_EXPENSE = [
   { key: 'SALARY',       label: 'Salary',       icon: Briefcase    },
@@ -191,9 +193,108 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
   )
 }
 
+// ── Staff View ────────────────────────────────────────────────────────────────
+function StaffView({ employees, transactions, settings, onEmployeeClick }) {
+  const currentMonth = format(new Date(), 'yyyy-MM')
+  const monthLabel   = format(new Date(), 'MMMM yyyy')
+
+  const fixedEmps    = employees.filter(e => e.type === 'FIXED')
+  const variableEmps = employees.filter(e => e.type === 'VARIABLE')
+
+  const getStats = (emp) => {
+    const txns = transactions.filter(t => t.employeeId === emp.id && t.date.startsWith(currentMonth))
+    const paid = txns.reduce((s, t) => s + t.amount, 0)
+    return { paid, count: txns.length, remaining: emp.type === 'FIXED' ? (emp.salary || 0) - paid : null }
+  }
+
+  if (employees.length === 0) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+      <p className="text-gray-500 font-semibold text-sm">No staff added yet</p>
+      <p className="text-gray-400 text-xs mt-1">Settings → Staff mein employees add karo</p>
+    </div>
+  )
+
+  return (
+    <div className="px-3 pt-2 pb-8">
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{monthLabel}</p>
+
+      {fixedEmps.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-bold px-1 mb-2" style={{ color: '#8B5CF6' }}>Fixed Salary</p>
+          <div className="space-y-2">
+            {fixedEmps.map(emp => {
+              const { paid, remaining } = getStats(emp)
+              return (
+                <div key={emp.id} onClick={() => onEmployeeClick(emp)}
+                  className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 cursor-pointer active:scale-95 transition-transform">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm flex-shrink-0">
+                      {emp.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm">{emp.name}</p>
+                      <p className="text-xs text-gray-400">₹{Number(emp.salary||0).toLocaleString('en-IN')}/month</p>
+                    </div>
+                    <span className="text-xs text-gray-400">Tap for details →</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-gray-50 rounded-xl p-2 text-center">
+                      <p className="text-xs text-gray-400 mb-0.5">Salary</p>
+                      <p className="font-bold text-gray-700 text-xs">{formatCurrency(emp.salary||0, settings.currency)}</p>
+                    </div>
+                    <div className="bg-rose-50 rounded-xl p-2 text-center">
+                      <p className="text-xs text-gray-400 mb-0.5">Paid</p>
+                      <p className="font-bold text-rose-500 text-xs">{formatCurrency(paid, settings.currency)}</p>
+                    </div>
+                    <div className="rounded-xl p-2 text-center" style={{ background: remaining >= 0 ? '#ECFDF5' : '#FFF1F2' }}>
+                      <p className="text-xs text-gray-400 mb-0.5">{remaining >= 0 ? 'Remaining' : 'Excess'}</p>
+                      <p className="font-bold text-xs" style={{ color: remaining >= 0 ? '#059669' : '#E11D48' }}>
+                        {formatCurrency(Math.abs(remaining), settings.currency)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {variableEmps.length > 0 && (
+        <div>
+          <p className="text-xs font-bold px-1 mb-2" style={{ color: '#F97316' }}>Variable Labour</p>
+          <div className="space-y-2">
+            {variableEmps.map(emp => {
+              const { paid, count } = getStats(emp)
+              return (
+                <div key={emp.id} onClick={() => onEmployeeClick(emp)}
+                  className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 cursor-pointer active:scale-95 transition-transform">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0">
+                      {emp.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-sm">{emp.name}</p>
+                      <p className="text-xs text-gray-400">{count} payment{count !== 1 ? 's' : ''} this month</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-400">Total Paid</p>
+                      <p className="font-bold text-rose-500 text-sm">{formatCurrency(paid, settings.currency)}</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 function MainApp() {
-  const { transactions, owners, settings, getCompanyBalance, getOwnerBalance, deleteTransaction } = useApp()
+  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction } = useApp()
 
   const [tab, setTab]               = useState('ALL')
   const [search, setSearch]         = useState('')
@@ -202,7 +303,8 @@ function MainApp() {
   const [editData, setEditData]     = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
-  const [selectedPartner, setSelectedPartner] = useState(null)
+  const [selectedPartner, setSelectedPartner]   = useState(null)
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [fromDate, setFromDate]     = useState(todayISO())
   const [toDate, setToDate]         = useState(todayISO())
   const [appliedFrom, setAppliedFrom] = useState(null)
@@ -422,15 +524,27 @@ function MainApp() {
           </div>
         </div>
 
-        {/* ── INLINE ADD FORM (right next to sidebar, no popup) ─────────── */}
-        <InlineAddForm
-          key={tab}
-          defaultMode={CATEGORY_TABS.has(tab) ? 'OUT' : INCOME_CATEGORY_TABS.has(tab) ? 'IN' : tab === 'IN' ? 'IN' : tab === 'OWNER' ? 'OWNER' : 'IN'}
-          defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
-        />
+        {/* ── INLINE ADD FORM ───────────────────────────────────────────── */}
+        {tab !== 'STAFF' && (
+          <InlineAddForm
+            key={tab}
+            defaultMode={CATEGORY_TABS.has(tab) ? 'OUT' : INCOME_CATEGORY_TABS.has(tab) ? 'IN' : tab === 'IN' ? 'IN' : tab === 'OWNER' ? 'OWNER' : 'IN'}
+            defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
+          />
+        )}
+
+        {/* ── STAFF VIEW ────────────────────────────────────────────────── */}
+        {tab === 'STAFF' && (
+          <StaffView
+            employees={employees}
+            transactions={transactions}
+            settings={settings}
+            onEmployeeClick={setSelectedEmployee}
+          />
+        )}
 
         {/* ── SEARCH + DATE FILTER + PDF/PRINT ─────────────────────────── */}
-        <div className="px-3 pt-2 pb-1">
+        {tab !== 'STAFF' && (<><div className="px-3 pt-2 pb-1">
           {/* Section label */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded" style={{ background: CAT_COLOR[tab] || '#1B5C20' }} />
@@ -629,7 +743,8 @@ function MainApp() {
               </div>
             </div>
           ))}
-        </div>
+        </div></>)}
+
       </div>
 
       {/* ── DELETE CONFIRM ────────────────────────────────────────────────── */}
@@ -671,6 +786,13 @@ function MainApp() {
         <PartnerDetail
           partner={selectedPartner}
           onClose={() => setSelectedPartner(null)}
+        />
+      )}
+
+      {selectedEmployee && (
+        <EmployeeDetail
+          employee={selectedEmployee}
+          onClose={() => setSelectedEmployee(null)}
         />
       )}
     </div>

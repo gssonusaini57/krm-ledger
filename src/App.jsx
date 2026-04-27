@@ -53,7 +53,7 @@ function Sidebar({ activeTab, onTabChange }) {
   return (
     <div
       className="fixed left-0 top-0 h-full z-30 flex flex-col overflow-y-auto"
-      style={{ width: 68, background: '#0B1426', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+      style={{ width: 56, background: '#0B1426', borderRight: '1px solid rgba(255,255,255,0.06)' }}
     >
       {/* Logo */}
       <div className="flex flex-col items-center py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -213,6 +213,34 @@ function MainApp() {
     win.document.close(); win.focus(); setTimeout(() => win.print(), 300)
   }
 
+  const handleDayPrint = (date, txns) => {
+    const totalIn  = txns.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0)
+    const totalOut = txns.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0)
+    const rows = [...txns].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(t => {
+      const partner = t.ownerId ? owners.find(o => o.id === t.ownerId)
+                    : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
+      const inf = isInflow(t.type)
+      return `<tr><td>${t.description||''}</td><td>${getCategoryLabel(t.category)||''}</td><td>${partner?.name||''}</td>
+        <td style="color:#10B981;text-align:right">${inf?'₹'+t.amount.toLocaleString('en-IN'):''}</td>
+        <td style="color:#F43F5E;text-align:right">${!inf?'₹'+t.amount.toLocaleString('en-IN'):''}</td></tr>`
+    }).join('')
+    const win = window.open('', '_blank')
+    win.document.write(`<!DOCTYPE html><html><head><title>KRM Ledger - ${date}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px}h2{margin:0 0 4px}
+    .s{display:flex;gap:16px;margin:12px 0}.b{padding:10px 16px;border-radius:8px}
+    table{width:100%;border-collapse:collapse}th{background:#1E293B;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase}
+    td{padding:7px 8px;border-bottom:1px solid #E2E8F0}tr:nth-child(even) td{background:#F8FAFC}</style></head><body>
+    <h2>${settings.companyName||'KRM Rice Mill'} — ${format(new Date(date),'dd MMMM yyyy')}</h2>
+    <div class="s">
+      <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CASH IN</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
+      <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">CASH OUT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
+      <div class="b" style="background:#EFF6FF"><div style="font-size:10px;color:#2563EB;font-weight:bold">NET</div><div style="font-size:18px;font-weight:bold;color:#3B82F6">₹${(totalIn-totalOut).toLocaleString('en-IN')}</div></div>
+    </div>
+    <table><thead><tr><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Cash In</th><th style="text-align:right">Cash Out</th></tr></thead>
+    <tbody>${rows}</tbody></table></body></html>`)
+    win.document.close(); win.focus(); setTimeout(() => win.print(), 300)
+  }
+
   const activeLabel = [...NAV_MAIN, ...NAV_EXPENSE].find(n => n.key === tab)?.label
 
   return (
@@ -222,7 +250,7 @@ function MainApp() {
       <Sidebar activeTab={tab} onTabChange={switchTab} />
 
       {/* ── MAIN CONTENT (offset by sidebar) ────────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: 68 }}>
+      <div className="flex flex-col flex-1" style={{ marginLeft: 56 }}>
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-20 flex items-center justify-between px-3 py-2.5"
@@ -373,6 +401,11 @@ function MainApp() {
                   }}>
                   {formatCurrency(txns.reduce((s,t) => s+(isInflow(t.type)?t.amount:-t.amount),0), settings.currency)}
                 </span>
+                <button onClick={() => handleDayPrint(date, txns)}
+                  className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                  title="Print this day">
+                  <Printer size={11} />
+                </button>
               </div>
 
               <div className="space-y-1.5">

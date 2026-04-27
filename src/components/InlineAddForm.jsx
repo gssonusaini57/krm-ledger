@@ -1,125 +1,116 @@
 import { useState } from 'react'
-import { Send } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
 
-const MODES = [
-  { key: 'IN',    label: '💰 Cash In'   },
-  { key: 'OUT',   label: '💸 Cash Out'  },
-  { key: 'OWNER', label: '👤 Partner'   },
-]
-
-export default function InlineAddForm({ defaultMode = 'IN' }) {
+export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = '' }) {
   const { owners, employees = [], addTransaction } = useApp()
 
-  const [mode, setMode]           = useState(defaultMode === 'OWNER' ? 'OWNER' : defaultMode === 'OUT' ? 'OUT' : 'IN')
-  const [amount, setAmount]       = useState('')
-  const [description, setDesc]    = useState('')
-  const [category, setCategory]   = useState('')
-  const [payMode, setPayMode]     = useState('CASH')
-  const [ownerId, setOwnerId]     = useState(owners[0]?.id || '')
-  const [ownerAction, setAction]  = useState('DEPOSIT')
-  const [ownerPaid, setOwnerPaid] = useState(false)
+  const isOwnerMode = defaultMode === 'OWNER'
+
+  const [amount, setAmount]           = useState('')
+  const [description, setDesc]        = useState('')
+  const [category, setCategory]       = useState(defaultCategory || '')
+  const [payMode, setPayMode]         = useState('CASH')
+  const [ownerId, setOwnerId]         = useState(owners[0]?.id || '')
+  const [ownerPaid, setOwnerPaid]     = useState(false)
   const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
-  const [partnerId, setPartnerId] = useState('')
-  const [date, setDate]           = useState(todayISO())
-  const [error, setError]         = useState('')
-  const [success, setSuccess]     = useState(false)
+  const [partnerId, setPartnerId]     = useState('')
+  const [date, setDate]               = useState(todayISO())
+  const [error, setError]             = useState('')
+  const [success, setSuccess]         = useState(false)
+  const [lastAction, setLastAction]   = useState('')
 
   const fixedEmps    = employees.filter(e => e.type === 'FIXED')
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
 
-  const switchMode = (m) => { setMode(m); setCategory(''); setOwnerPaid(false); setError('') }
-
   const reset = () => {
-    setAmount(''); setDesc(''); setCategory(''); setOwnerPaid(false); setError('')
+    setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
     setPayMode('CASH'); setDate(todayISO()); setPartnerId('')
   }
 
-  const handleSave = () => {
-    setError('')
+  const validate = () => {
     const amt = parseFloat(amount)
-    if (!amt || amt <= 0)                       return setError('Enter amount')
-    if (!description.trim())                    return setError('Enter description')
-    if (mode === 'OWNER' && !ownerId)           return setError('Select owner')
-    if (mode === 'OUT' && ownerPaid && !ownerPaidId) return setError('Select which owner paid')
+    if (!amt || amt <= 0)    { setError('Enter amount'); return null }
+    if (!description.trim()) { setError('Enter description'); return null }
+    return amt
+  }
 
-    if (mode === 'IN') {
-      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: partnerId || null })
-    }
-    if (mode === 'OUT') {
-      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: partnerId || null })
-      if (ownerPaid && ownerPaidId) {
-        addTransaction({
-          date, amount: amt,
-          description: `${owners.find(o => o.id === ownerPaidId)?.name} paid: ${description}`,
-          category: '', type: TRANSACTION_TYPES.OWNER_DEPOSIT, paymentMode: '', ownerId: ownerPaidId,
-        })
-      }
-    }
-    if (mode === 'OWNER') {
-      const type = ownerAction === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
-      addTransaction({ date, amount: amt, description, category: '', type, paymentMode: '', ownerId })
-    }
-
-    setSuccess(true)
-    reset()
+  const handleCashIn = () => {
+    setError('')
+    const amt = validate(); if (!amt) return
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: partnerId || null })
+    setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
 
-  const cats = mode === 'IN' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const handleCashOut = () => {
+    setError('')
+    const amt = validate(); if (!amt) return
+    if (ownerPaid && !ownerPaidId) { setError('Select which partner paid'); return }
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: partnerId || null })
+    if (ownerPaid && ownerPaidId) {
+      addTransaction({
+        date, amount: amt,
+        description: `${owners.find(o => o.id === ownerPaidId)?.name} paid: ${description}`,
+        category: '', type: TRANSACTION_TYPES.OWNER_DEPOSIT, paymentMode: '', ownerId: ownerPaidId,
+      })
+    }
+    setLastAction('OUT'); setSuccess(true); reset()
+    setTimeout(() => setSuccess(false), 1200)
+  }
+
+  const handleOwnerSave = (action) => {
+    setError('')
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0)    { setError('Enter amount'); return }
+    if (!description.trim()) { setError('Enter description'); return }
+    if (!ownerId)            { setError('Select partner'); return }
+    const type = action === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
+    addTransaction({ date, amount: amt, description, category: '', type, paymentMode: '', ownerId })
+    setSuccess(true); reset()
+    setTimeout(() => setSuccess(false), 1200)
+  }
 
   return (
     <div className="mx-4 my-3 rounded-3xl overflow-hidden shadow-lg border border-gray-100 bg-white">
+      <div className="px-4 pb-4 pt-4 space-y-3">
 
-      {/* Mode selector */}
-      <div className="flex gap-1 p-2" style={{ background: '#F8FAFC' }}>
-        {MODES.map(m => (
-          <button key={m.key} type="button" onClick={() => switchMode(m.key)}
-            className="flex-1 py-2.5 rounded-2xl text-sm font-bold transition-all duration-150"
-            style={mode === m.key
-              ? { background: 'linear-gradient(135deg,#1E293B,#334155)', color: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }
-              : { color: '#94A3B8' }
-            }
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="px-4 pb-4 pt-2 space-y-3">
-
-        {/* Amount + Date row */}
+        {/* Date + Amount */}
         <div className="flex gap-2">
-          <input
-            type="number" min="1" placeholder="₹ Amount"
-            value={amount} onChange={e => setAmount(e.target.value)}
-            className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-xl font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
-          />
           <input
             type="date" value={date} onChange={e => setDate(e.target.value)}
             className="w-36 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
           />
+          <input
+            type="number" min="1" placeholder="Amount ₹"
+            value={amount} onChange={e => setAmount(e.target.value)}
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-xl font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
+          />
         </div>
+
+        {/* Category — combined IN/OUT */}
+        {!isOwnerMode && (
+          <select value={category} onChange={e => setCategory(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
+            <option value="">-- Direct Entry --</option>
+            <optgroup label="Cash In Categories">
+              {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </optgroup>
+            <optgroup label="Cash Out Categories">
+              {EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </optgroup>
+          </select>
+        )}
 
         {/* Description */}
         <input
-          type="text" placeholder="Description — what is this for?"
+          type="text" placeholder="Details (bk, st, lb, tr)..."
           value={description} onChange={e => setDesc(e.target.value)}
           className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
         />
 
-        {/* Cash In / Cash Out — category */}
-        {(mode === 'IN' || mode === 'OUT') && (
-          <select value={category} onChange={e => setCategory(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
-            <option value="">Category (optional)</option>
-            {cats.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        )}
-
-        {/* Link to Partner — optional for Cash In/Out */}
-        {(mode === 'IN' || mode === 'OUT') && (
+        {/* Link to Partner */}
+        {!isOwnerMode && (
           <select value={partnerId} onChange={e => setPartnerId(e.target.value)}
             className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
             <option value="">Link to Partner (optional)</option>
@@ -128,7 +119,7 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
         )}
 
         {/* Employee quick-pick for Salary / Labour */}
-        {mode === 'OUT' && (category === 'SALARY' || category === 'LABOUR') && (() => {
+        {!isOwnerMode && (category === 'SALARY' || category === 'LABOUR') && (() => {
           const isSalary = category === 'SALARY'
           const pool = isSalary ? fixedEmps : variableEmps
           if (!pool.length) return null
@@ -155,8 +146,8 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
           )
         })()}
 
-        {/* Cash Out — pay mode + owner-paid */}
-        {mode === 'OUT' && (
+        {/* Pay mode + partner-paid */}
+        {!isOwnerMode && (
           <div className="flex flex-wrap gap-2 items-center">
             {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
               <button key={opt.key} type="button" onClick={() => setPayMode(opt.key)}
@@ -168,12 +159,10 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
                 {opt.icon} {opt.label}
               </button>
             ))}
-
             <label className="flex items-center gap-2 cursor-pointer ml-1">
               <input type="checkbox" checked={ownerPaid} onChange={e => setOwnerPaid(e.target.checked)} className="accent-amber-500 w-4 h-4" />
               <span className="text-xs font-semibold text-gray-500">Partner paid?</span>
             </label>
-
             {ownerPaid && (
               <select value={ownerPaidId} onChange={e => setOwnerPaidId(e.target.value)}
                 className="flex-1 min-w-[130px] bg-amber-50 border-2 border-amber-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-amber-800 focus:outline-none">
@@ -183,41 +172,49 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
           </div>
         )}
 
-        {/* Partner tab fields */}
-        {mode === 'OWNER' && (
-          <div className="flex gap-2 flex-wrap">
-            <select value={ownerId} onChange={e => setOwnerId(e.target.value)}
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
-              {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-            {[{ key: 'DEPOSIT', label: '⬆ Deposited' }, { key: 'WITHDRAWAL', label: '⬇ Personal' }].map(opt => (
-              <button key={opt.key} type="button" onClick={() => setAction(opt.key)}
-                className="px-3 py-2.5 rounded-2xl text-xs font-bold border-2 transition-all"
-                style={ownerAction === opt.key
-                  ? opt.key === 'DEPOSIT'
-                    ? { borderColor: '#10B981', background: '#ECFDF5', color: '#059669' }
-                    : { borderColor: '#F43F5E', background: '#FFF1F2', color: '#E11D48' }
-                  : { borderColor: '#E2E8F0', color: '#94A3B8' }
-                }>
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        {/* Partner select (OWNER mode only) */}
+        {isOwnerMode && (
+          <select value={ownerId} onChange={e => setOwnerId(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
+            {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
         )}
 
         {/* Error */}
         {error && <p className="text-xs text-red-500 font-semibold px-1">{error}</p>}
 
-        {/* Save */}
-        <button type="button" onClick={handleSave}
-          className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
-          style={success
-            ? { background: '#10B981' }
-            : { background: 'linear-gradient(135deg,#3B82F6,#6366F1)', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }
-          }
-        >
-          {success ? '✓ Saved!' : <><Send size={15} /> Save Entry</>}
-        </button>
+        {/* Action buttons */}
+        {isOwnerMode ? (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => handleOwnerSave('DEPOSIT')}
+              className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white transition-all active:scale-95"
+              style={{ background: success ? '#10B981' : 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}>
+              {success ? '✓ Saved!' : '⬆ Deposited'}
+            </button>
+            <button type="button" onClick={() => handleOwnerSave('WITHDRAWAL')}
+              className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg,#F43F5E,#E11D48)', boxShadow: '0 4px 12px rgba(244,63,94,0.3)' }}>
+              ⬇ Personal
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button type="button" onClick={handleCashIn}
+              className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white uppercase tracking-wide transition-all active:scale-95"
+              style={success && lastAction === 'IN'
+                ? { background: '#34D399' }
+                : { background: 'linear-gradient(135deg,#16A34A,#15803D)', boxShadow: '0 4px 12px rgba(22,163,74,0.35)' }}>
+              {success && lastAction === 'IN' ? '✓ Saved!' : 'Cash In'}
+            </button>
+            <button type="button" onClick={handleCashOut}
+              className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white uppercase tracking-wide transition-all active:scale-95"
+              style={success && lastAction === 'OUT'
+                ? { background: '#FB7185' }
+                : { background: 'linear-gradient(135deg,#DC2626,#B91C1C)', boxShadow: '0 4px 12px rgba(220,38,38,0.35)' }}>
+              {success && lastAction === 'OUT' ? '✓ Saved!' : 'Cash Out'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

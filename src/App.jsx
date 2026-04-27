@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
 import TransactionForm from './components/TransactionForm'
+import PartnerDetail from './components/PartnerDetail'
 import InlineAddForm from './components/InlineAddForm'
 import SettingsModal from './components/SettingsModal'
 import {
@@ -58,6 +59,7 @@ function MainApp() {
   const [editData, setEditData]     = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
+  const [selectedPartner, setSelectedPartner] = useState(null)
 
   // Build list of months that have at least one transaction
   const availableMonths = useMemo(() => {
@@ -336,7 +338,9 @@ function MainApp() {
             const bal = getOwnerBalance(owner.id)
             const color = owner.color || OWNER_COLORS[i]
             return (
-              <div key={owner.id} className="flex-shrink-0 rounded-2xl p-4 text-white min-w-[160px] shadow-lg"
+              <div key={owner.id}
+                onClick={() => setSelectedPartner(owner)}
+                className="flex-shrink-0 rounded-2xl p-4 text-white min-w-[160px] shadow-lg cursor-pointer active:scale-95 transition-transform"
                 style={{ background: `linear-gradient(135deg, ${color}, ${color}CC)` }}>
                 <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm mb-3">
                   {owner.name.charAt(0).toUpperCase()}
@@ -344,6 +348,7 @@ function MainApp() {
                 <p className="font-semibold text-sm text-white/90 mb-1">{owner.name}</p>
                 <p className="font-bold text-xl">{formatCurrency(Math.abs(bal), settings.currency)}</p>
                 <p className="text-white/60 text-xs mt-0.5">{bal >= 0 ? 'Company owes partner' : 'Partner owes company'}</p>
+                <p className="text-white/40 text-xs mt-1">Tap to view details →</p>
               </div>
             )
           })}
@@ -479,6 +484,13 @@ function MainApp() {
       )}
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+
+      {selectedPartner && (
+        <PartnerDetail
+          partner={selectedPartner}
+          onClose={() => setSelectedPartner(null)}
+        />
+      )}
     </div>
   )
 }

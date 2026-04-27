@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { X, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { formatCurrency, isInflow, getCategoryLabel } from '../utils/helpers'
+import { TRANSACTION_TYPES, formatCurrency, isInflow, getCategoryLabel } from '../utils/helpers'
 import { format, isToday, isYesterday } from 'date-fns'
 
 function dayLabel(dateStr) {

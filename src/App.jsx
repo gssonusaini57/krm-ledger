@@ -233,7 +233,14 @@ function MainApp() {
   const [appliedFrom, setAppliedFrom] = useState(null)
   const [appliedTo, setAppliedTo]   = useState(null)
 
-  const balance = getCompanyBalance()
+  const cashInHand = useMemo(() =>
+    transactions.reduce((sum, t) => {
+      if (t.type === TRANSACTION_TYPES.CASH_IN)  return sum + t.amount
+      if (t.type === TRANSACTION_TYPES.EXPENSE)  return sum - t.amount
+      return sum
+    }, 0),
+    [transactions]
+  )
 
   const availableMonths = useMemo(() => {
     const seen = new Set()
@@ -423,7 +430,7 @@ function MainApp() {
                 {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash In Hand'}
               </p>
               <p className="font-bold text-yellow-400" style={{ fontSize: 26, lineHeight: 1 }}>
-                {formatCurrency(balance, settings.currency)}
+                {formatCurrency(cashInHand, settings.currency)}
               </p>
             </div>
             <div className="grid grid-cols-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>

@@ -9,7 +9,7 @@ import {
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight,
-  Pencil, Trash2, Search, X as XIcon, Wheat
+  Pencil, Trash2, Search, X as XIcon, Wheat, Printer
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 
@@ -18,7 +18,7 @@ const TABS = [
   { key: 'ALL',         label: 'All'         },
   { key: 'IN',          label: 'Cash In'     },
   { key: 'OUT',         label: 'Cash Out'    },
-  { key: 'OWNER',       label: 'Owner'       },
+  { key: 'OWNER',       label: 'Partner'     },
   { key: 'SALARY',      label: 'Salary'      },
   { key: 'LABOUR',      label: 'Labour'      },
   { key: 'BANK',        label: 'Bank'        },
@@ -97,7 +97,11 @@ function MainApp() {
         if (monthFilter && !t.date.startsWith(monthFilter)) return false
         if (tab === 'IN')    { if (t.type !== TRANSACTION_TYPES.CASH_IN) return false }
         else if (tab === 'OUT')   { if (t.type !== TRANSACTION_TYPES.EXPENSE) return false }
-        else if (tab === 'OWNER') { if (t.type !== TRANSACTION_TYPES.OWNER_DEPOSIT && t.type !== TRANSACTION_TYPES.OWNER_WITHDRAWAL) return false }
+        else if (tab === 'OWNER') {
+          const isPartnerTxn = t.type === TRANSACTION_TYPES.OWNER_DEPOSIT || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL
+          const isLinked = t.partnerId && (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.EXPENSE)
+          if (!isPartnerTxn && !isLinked) return false
+        }
         else if (CATEGORY_TABS.has(tab)) {
           if (t.type !== TRANSACTION_TYPES.EXPENSE || t.category !== tab) return false
         }
@@ -123,6 +127,56 @@ function MainApp() {
   const switchTab = (key) => { setTab(key); setSearch('') }
   const openEdit  = (t) => { setEditData(t); setShowEditForm(true) }
 
+  const handlePrint = () => {
+    const periodLabel = monthFilter
+      ? format(new Date(monthFilter + '-01'), 'MMMM yyyy')
+      : tab !== 'ALL' ? TABS.find(t => t.key === tab)?.label : 'All Transactions'
+    const totalIn  = filtered.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0)
+    const totalOut = filtered.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0)
+    const rows = filtered
+      .sort((a, b) => a.date.localeCompare(b.date) || new Date(a.createdAt) - new Date(b.createdAt))
+      .map(t => {
+        const partner = t.ownerId   ? owners.find(o => o.id === t.ownerId)
+                      : t.partnerId ? owners.find(o => o.id === t.partnerId)
+                      : null
+        const inflow = isInflow(t.type)
+        return `<tr>
+          <td>${t.date}</td>
+          <td>${t.description || ''}</td>
+          <td>${getCategoryLabel(t.category) || ''}</td>
+          <td>${partner?.name || ''}</td>
+          <td style="color:#10B981;text-align:right">${inflow ? '₹' + t.amount.toLocaleString('en-IN') : ''}</td>
+          <td style="color:#F43F5E;text-align:right">${!inflow ? '₹' + t.amount.toLocaleString('en-IN') : ''}</td>
+        </tr>`
+      }).join('')
+    const win = window.open('', '_blank')
+    win.document.write(`<!DOCTYPE html><html><head><title>KRM Ledger - ${periodLabel}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;color:#1E293B;padding:24px}
+      h2{margin:0 0 4px;font-size:18px}p{margin:0 0 16px;color:#64748B}
+      .summary{display:flex;gap:16px;margin-bottom:20px}
+      .box{padding:12px 20px;border-radius:8px;min-width:140px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#1E293B;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase}
+      td{padding:7px 10px;border-bottom:1px solid #E2E8F0;font-size:12px}
+      tr:nth-child(even) td{background:#F8FAFC}
+      @media print{body{padding:0}}
+    </style></head><body>
+    <h2>${settings.companyName || 'KRM Rice Mill'}</h2>
+    <p>Ledger Report &mdash; ${periodLabel} &mdash; Printed: ${format(new Date(), 'dd MMM yyyy')}</p>
+    <div class="summary">
+      <div class="box" style="background:#ECFDF5"><div style="font-size:11px;color:#059669;font-weight:bold">TOTAL CASH IN</div><div style="font-size:20px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
+      <div class="box" style="background:#FFF1F2"><div style="font-size:11px;color:#E11D48;font-weight:bold">TOTAL CASH OUT</div><div style="font-size:20px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
+      <div class="box" style="background:#EFF6FF"><div style="font-size:11px;color:#2563EB;font-weight:bold">NET</div><div style="font-size:20px;font-weight:bold;color:#3B82F6">₹${(totalIn - totalOut).toLocaleString('en-IN')}</div></div>
+    </div>
+    <table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Cash In</th><th style="text-align:right">Cash Out</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    </body></html>`)
+    win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 300)
+  }
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#F1F5F9' }}>
 
@@ -141,11 +195,19 @@ function MainApp() {
               </div>
               <p className="text-white font-bold text-base">{settings.companyName || 'KRM Rice Mill'}</p>
             </div>
-            <button onClick={() => setShowSettings(true)}
-              className="absolute right-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-              style={{ background: 'rgba(255,255,255,0.08)' }}>
-              <Settings size={16} color="rgba(255,255,255,0.7)" />
-            </button>
+            <div className="absolute right-0 flex items-center gap-2">
+              <button onClick={handlePrint}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                style={{ background: 'rgba(255,255,255,0.08)' }}
+                title="Print / PDF">
+                <Printer size={16} color="rgba(255,255,255,0.7)" />
+              </button>
+              <button onClick={() => setShowSettings(true)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <Settings size={16} color="rgba(255,255,255,0.7)" />
+              </button>
+            </div>
           </div>
 
           {/* Balance */}
@@ -281,7 +343,7 @@ function MainApp() {
                 </div>
                 <p className="font-semibold text-sm text-white/90 mb-1">{owner.name}</p>
                 <p className="font-bold text-xl">{formatCurrency(Math.abs(bal), settings.currency)}</p>
-                <p className="text-white/60 text-xs mt-0.5">{bal >= 0 ? 'Company owes owner' : 'Owner owes company'}</p>
+                <p className="text-white/60 text-xs mt-0.5">{bal >= 0 ? 'Company owes partner' : 'Partner owes company'}</p>
               </div>
             )
           })}
@@ -317,7 +379,9 @@ function MainApp() {
               <div className="space-y-2">
                 {txns.map(t => {
                   const inflow = isInflow(t.type)
-                  const owner  = t.ownerId ? owners.find(o => o.id === t.ownerId) : null
+                  const owner  = t.ownerId   ? owners.find(o => o.id === t.ownerId)
+                               : t.partnerId ? owners.find(o => o.id === t.partnerId)
+                               : null
                   const catColor = CAT_COLOR[t.category] || (inflow ? '#10B981' : '#F43F5E')
 
                   return (

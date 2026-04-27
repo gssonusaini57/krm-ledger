@@ -4,9 +4,9 @@ import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
 
 const MODES = [
-  { key: 'IN',    label: '💰 Cash In'  },
-  { key: 'OUT',   label: '💸 Cash Out' },
-  { key: 'OWNER', label: '👤 Owner'    },
+  { key: 'IN',    label: '💰 Cash In'   },
+  { key: 'OUT',   label: '💸 Cash Out'  },
+  { key: 'OWNER', label: '👤 Partner'   },
 ]
 
 export default function InlineAddForm({ defaultMode = 'IN' }) {
@@ -21,6 +21,7 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
   const [ownerAction, setAction]  = useState('DEPOSIT')
   const [ownerPaid, setOwnerPaid] = useState(false)
   const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
+  const [partnerId, setPartnerId] = useState('')
   const [date, setDate]           = useState(todayISO())
   const [error, setError]         = useState('')
   const [success, setSuccess]     = useState(false)
@@ -32,7 +33,7 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
 
   const reset = () => {
     setAmount(''); setDesc(''); setCategory(''); setOwnerPaid(false); setError('')
-    setPayMode('CASH'); setDate(todayISO())
+    setPayMode('CASH'); setDate(todayISO()); setPartnerId('')
   }
 
   const handleSave = () => {
@@ -44,10 +45,10 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
     if (mode === 'OUT' && ownerPaid && !ownerPaidId) return setError('Select which owner paid')
 
     if (mode === 'IN') {
-      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null })
+      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: partnerId || null })
     }
     if (mode === 'OUT') {
-      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null })
+      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: partnerId || null })
       if (ownerPaid && ownerPaidId) {
         addTransaction({
           date, amount: amt,
@@ -117,6 +118,15 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
           </select>
         )}
 
+        {/* Link to Partner — optional for Cash In/Out */}
+        {(mode === 'IN' || mode === 'OUT') && (
+          <select value={partnerId} onChange={e => setPartnerId(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
+            <option value="">Link to Partner (optional)</option>
+            {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        )}
+
         {/* Employee quick-pick for Salary / Labour */}
         {mode === 'OUT' && (category === 'SALARY' || category === 'LABOUR') && (() => {
           const isSalary = category === 'SALARY'
@@ -161,7 +171,7 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
 
             <label className="flex items-center gap-2 cursor-pointer ml-1">
               <input type="checkbox" checked={ownerPaid} onChange={e => setOwnerPaid(e.target.checked)} className="accent-amber-500 w-4 h-4" />
-              <span className="text-xs font-semibold text-gray-500">Owner paid?</span>
+              <span className="text-xs font-semibold text-gray-500">Partner paid?</span>
             </label>
 
             {ownerPaid && (
@@ -173,7 +183,7 @@ export default function InlineAddForm({ defaultMode = 'IN' }) {
           </div>
         )}
 
-        {/* Owner tab fields */}
+        {/* Partner tab fields */}
         {mode === 'OWNER' && (
           <div className="flex gap-2 flex-wrap">
             <select value={ownerId} onChange={e => setOwnerId(e.target.value)}

@@ -9,9 +9,9 @@ import { isInflow, TRANSACTION_TYPES } from '../utils/helpers'
 const AppContext = createContext()
 
 const DEFAULT_OWNERS = [
-  { id: 'owner-1', name: 'Owner 1', phone: '', sharePercent: 40, color: '#3B82F6' },
-  { id: 'owner-2', name: 'Owner 2', phone: '', sharePercent: 35, color: '#10B981' },
-  { id: 'owner-3', name: 'Owner 3', phone: '', sharePercent: 25, color: '#F59E0B' },
+  { id: 'owner-1', name: 'Karamjit Singh',   phone: '', sharePercent: 34, color: '#3B82F6' },
+  { id: 'owner-2', name: 'Sukhwinder Singh', phone: '', sharePercent: 33, color: '#10B981' },
+  { id: 'owner-3', name: 'Jaswinder Singh',  phone: '', sharePercent: 33, color: '#F59E0B' },
 ]
 
 const DEFAULT_SETTINGS = {
@@ -33,7 +33,13 @@ export function AppProvider({ children }) {
     const unsub = onSnapshot(configRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data()
-        if (data.owners)    setOwners(data.owners)
+        let ownersData = data.owners || DEFAULT_OWNERS
+        // Auto-migrate generic "Owner 1/2/3" names to real partner names
+        if (ownersData.some(o => /^Owner \d$/.test(o.name))) {
+          ownersData = ownersData.map((o, i) => ({ ...o, name: DEFAULT_OWNERS[i]?.name || o.name }))
+          setDoc(configRef, { owners: ownersData }, { merge: true })
+        }
+        setOwners(ownersData)
         if (data.settings)  setSettings(data.settings)
         if (data.employees) setEmployees(data.employees)
       } else {
@@ -114,8 +120,9 @@ export function AppProvider({ children }) {
         return bal
       }, 0)
 
+  // Returns partner's own deposits/withdrawals + any Cash In/Out linked to them
   const getOwnerTransactions = (ownerId) =>
-    transactions.filter(t => t.ownerId === ownerId)
+    transactions.filter(t => t.ownerId === ownerId || t.partnerId === ownerId)
 
   const getTotals = (txns) => {
     let inflow = 0, outflow = 0

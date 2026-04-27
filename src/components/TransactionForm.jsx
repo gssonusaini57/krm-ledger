@@ -6,7 +6,7 @@ import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } fr
 const MODES = [
   { key: 'IN',    label: '💰 Cash In'  },
   { key: 'OUT',   label: '💸 Cash Out' },
-  { key: 'OWNER', label: '👤 Owner'    },
+  { key: 'OWNER', label: '👤 Partner'  },
 ]
 
 export default function TransactionForm({ onClose, editData = null, defaultTab = 'IN', defaultCategory = '' }) {
@@ -20,6 +20,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
   const [ownerPaid, setOwnerPaid] = useState(false)
   const [ownerId, setOwnerId]     = useState(owners[0]?.id || '')
   const [ownerAction, setAction]  = useState('DEPOSIT')
+  const [partnerId, setPartnerId] = useState('')
   const [date, setDate]           = useState(todayISO())
   const [error, setError]         = useState('')
 
@@ -34,6 +35,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
     setPayment(editData.paymentMode === 'ONLINE' ? 'ONLINE' : 'CASH')
     setOwnerId(editData.ownerId || owners[0]?.id || '')
     setAction(editData.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL ? 'WITHDRAWAL' : 'DEPOSIT')
+    setPartnerId(editData.partnerId || '')
     setDate(editData.date || todayISO())
   }, [editData])
 
@@ -52,15 +54,15 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
       let type = TRANSACTION_TYPES.CASH_IN
       if (tab === 'OUT')   type = TRANSACTION_TYPES.EXPENSE
       if (tab === 'OWNER') type = ownerAction === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
-      updateTransaction({ ...editData, date, amount: amt, description, category, paymentMode: tab === 'OUT' ? paymentMode : '', type, ownerId: tab === 'OWNER' ? ownerId : null })
+      updateTransaction({ ...editData, date, amount: amt, description, category, paymentMode: tab === 'OUT' ? paymentMode : '', type, ownerId: tab === 'OWNER' ? ownerId : null, partnerId: (tab === 'IN' || tab === 'OUT') ? (partnerId || null) : null })
       return onClose()
     }
 
     if (tab === 'IN') {
-      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null })
+      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: partnerId || null })
     }
     if (tab === 'OUT') {
-      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode, ownerId: null })
+      addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode, ownerId: null, partnerId: partnerId || null })
       if (ownerPaid && ownerId) {
         addTransaction({
           date, amount: amt,
@@ -147,6 +149,18 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             </div>
           )}
 
+          {/* Link to Partner — optional for Cash In/Out */}
+          {(tab === 'IN' || tab === 'OUT') && (
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Link to Partner</label>
+              <select value={partnerId} onChange={e => setPartnerId(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all">
+                <option value="">None (optional)</option>
+                {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+          )}
+
           {/* Employee picker — Salary or Labour category */}
           {tab === 'OUT' && (category === 'SALARY' || category === 'LABOUR') && (() => {
             const isSalary   = category === 'SALARY'
@@ -203,7 +217,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             </div>
           )}
 
-          {/* Owner paid this? — Cash Out only */}
+          {/* Partner paid this? — Cash Out only */}
           {tab === 'OUT' && !editData && (
             <div className="rounded-2xl border-2 p-4 transition-all"
               style={ownerPaid ? { borderColor: '#F59E0B', background: '#FFFBEB' } : { borderColor: '#E2E8F0', background: '#F8FAFC' }}>
@@ -214,15 +228,15 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
                   <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${ownerPaid ? 'left-5' : 'left-0.5'}`} />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-gray-800">Owner paid from their pocket?</p>
-                  <p className="text-xs text-gray-400 mt-0.5">e.g. owner paid truck driver directly</p>
+                  <p className="text-sm font-bold text-gray-800">Partner paid from their pocket?</p>
+                  <p className="text-xs text-gray-400 mt-0.5">e.g. partner paid truck driver directly</p>
                 </div>
               </label>
               {ownerPaid && (
                 <div className="mt-3">
                   <select value={ownerId} onChange={e => setOwnerId(e.target.value)}
                     className="w-full bg-white border-2 border-amber-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all">
-                    <option value="">Select owner...</option>
+                    <option value="">Select partner...</option>
                     {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                   {ownerId && (
@@ -235,11 +249,11 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             </div>
           )}
 
-          {/* Owner fields */}
+          {/* Partner fields */}
           {tab === 'OWNER' && (
             <>
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Owner</label>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Partner</label>
                 <select value={ownerId} onChange={e => setOwnerId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
                   <option value="">Select owner...</option>

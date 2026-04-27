@@ -126,10 +126,20 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 }
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
-function ReportPanel({ todayIn, todayOut, monthIn, monthOut, monthFilter, owners, getOwnerBalance, settings, onPartnerClick }) {
+function ReportPanel({ todayIn, todayOut, monthIn, monthOut, monthFilter, owners, transactions, settings, onPartnerClick }) {
   const displayIn  = monthFilter ? monthIn  : todayIn
   const displayOut = monthFilter ? monthOut : todayOut
   const periodLabel = monthFilter ? format(new Date(monthFilter+'-01'), 'MMM yyyy') : 'Today'
+
+  const partnerStats = useMemo(() =>
+    owners.map(owner => {
+      const txns = transactions.filter(t => t.ownerId === owner.id || t.partnerId === owner.id)
+      const cashIn  = txns.filter(t => t.type === 'OWNER_DEPOSIT').reduce((s, t) => s + t.amount, 0)
+      const cashOut = txns.filter(t => t.type === 'OWNER_WITHDRAWAL').reduce((s, t) => s + t.amount, 0)
+      return { ...owner, cashIn, cashOut }
+    }),
+    [owners, transactions]
+  )
 
   return (
     <div className="fixed right-0 top-0 h-full z-30 flex flex-col overflow-y-auto"
@@ -162,33 +172,45 @@ function ReportPanel({ todayIn, todayOut, monthIn, monthOut, monthFilter, owners
         </div>
       </div>
 
-      {/* Partners */}
-      <div className="px-4 py-3">
-        <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Partner Cash</p>
-        <div className="space-y-1.5">
-          {owners.map((owner, i) => {
-            const bal = getOwnerBalance(owner.id)
-            const color = owner.color || OWNER_COLORS[i]
-            return (
-              <div key={owner.id} onClick={() => onPartnerClick(owner)}
-                className="flex items-center gap-2.5 cursor-pointer rounded-lg p-2 transition-all"
-                style={{ background: 'rgba(255,255,255,0.04)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
-                <div className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+      {/* Partner Cash — each partner's own Cash In / Cash Out */}
+      <div className="px-3 py-3 space-y-2">
+        <p className="text-white/40 text-xs uppercase tracking-wide px-1">Partner Cash</p>
+        {partnerStats.map((owner, i) => {
+          const color = owner.color || OWNER_COLORS[i]
+          return (
+            <div key={owner.id} onClick={() => onPartnerClick(owner)}
+              className="cursor-pointer rounded-lg p-2.5 transition-all"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.09)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}>
+              {/* Name row */}
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-7 h-7 rounded flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
                   style={{ background: color }}>
                   {owner.name.charAt(0)}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white/70 text-xs truncate">{owner.name.split(' ')[0]}</p>
-                  <p className="font-bold text-xs" style={{ color: bal >= 0 ? '#34D399' : '#FB7185' }}>
-                    {formatCurrency(Math.abs(bal), settings.currency)}
-                  </p>
+                <p className="text-white/80 text-xs font-semibold">{owner.name.split(' ')[0]}</p>
+              </div>
+              {/* Cash In / Cash Out rows */}
+              <div className="space-y-1 pl-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-white/40 text-xs">Cash In</span>
+                  <span className="font-bold text-xs text-emerald-400">{formatCurrency(owner.cashIn, settings.currency)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-white/40 text-xs">Cash Out</span>
+                  <span className="font-bold text-xs text-rose-400">{formatCurrency(owner.cashOut, settings.currency)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span className="text-white/40 text-xs">Net</span>
+                  <span className="font-bold text-xs" style={{ color: (owner.cashIn - owner.cashOut) >= 0 ? '#FBBF24' : '#FB7185' }}>
+                    {formatCurrency(owner.cashIn - owner.cashOut, settings.currency)}
+                  </span>
                 </div>
               </div>
-            )
-          })}
-        </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -370,7 +392,7 @@ function MainApp() {
         monthIn={monthIn} monthOut={monthOut}
         monthFilter={monthFilter}
         owners={owners}
-        getOwnerBalance={getOwnerBalance}
+        transactions={transactions}
         settings={settings}
         onPartnerClick={setSelectedPartner}
       />

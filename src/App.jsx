@@ -172,7 +172,7 @@ function ReportPanel({ balance, todayIn, todayOut, monthIn, monthOut, monthFilte
 
       {/* Partners */}
       <div className="px-4 py-3">
-        <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Partners</p>
+        <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Partner Cash</p>
         <div className="space-y-1.5">
           {owners.map((owner, i) => {
             const bal = getOwnerBalance(owner.id)
@@ -414,23 +414,29 @@ function MainApp() {
               style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
               {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') + ' Ledger' : 'Daily Ledger'}
             </p>
-            <div className="grid grid-cols-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="grid grid-cols-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="py-3 px-2 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
                 <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Total In (+)</p>
-                <p className="font-bold text-yellow-400" style={{ fontSize: 17 }}>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 16 }}>
                   {formatCurrency(monthFilter ? monthIn : todayIn, settings.currency)}
                 </p>
               </div>
               <div className="py-3 px-2 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
                 <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Total Out (-)</p>
-                <p className="font-bold text-yellow-400" style={{ fontSize: 17 }}>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 16 }}>
                   {formatCurrency(monthFilter ? monthOut : todayOut, settings.currency)}
                 </p>
               </div>
-              <div className="py-3 px-2 text-center">
+              <div className="py-3 px-2 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
                 <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Net Balance</p>
-                <p className="font-bold text-yellow-400" style={{ fontSize: 17 }}>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 16 }}>
                   {formatCurrency((monthFilter ? monthIn : todayIn) - (monthFilter ? monthOut : todayOut), settings.currency)}
+                </p>
+              </div>
+              <div className="py-3 px-2 text-center">
+                <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Cash In Hand</p>
+                <p className="font-bold" style={{ fontSize: 16, color: balance >= 0 ? '#FBBF24' : '#FB7185' }}>
+                  {formatCurrency(balance, settings.currency)}
                 </p>
               </div>
             </div>

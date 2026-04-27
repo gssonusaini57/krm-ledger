@@ -17,6 +17,7 @@ export const TYPE_LABELS = {
 export const INCOME_CATEGORIES = [
   { value: 'RICE_SALES', label: 'Rice Sales' },
   { value: 'PADDY_SALES', label: 'Paddy Sales' },
+  { value: 'BROKEN_SELL', label: 'Broken Sell' },
   { value: 'MILLING_CHARGES', label: 'Milling Charges' },
   { value: 'BRAN_SALES', label: 'Rice Bran / Husk Sales' },
   { value: 'LOAN_RECEIVED', label: 'Loan Received' },
@@ -31,6 +32,9 @@ export const EXPENSE_CATEGORIES = [
   { value: 'EXPENDITURE',      label: 'Expenditure' },
   { value: 'ASHOK_DEPOT',      label: 'Ashok Depot' },
   { value: 'TRUCK',            label: 'Truck' },
+  { value: 'PANKAJ_PLASH',     label: 'Pankaj Plash' },
+  { value: 'AMAN_PLASH',       label: 'Aman Plash' },
+  { value: 'BROKEN_BUY',       label: 'Broken Buy' },
   { value: 'PADDY_PURCHASE',   label: 'Paddy Purchase' },
   { value: 'LABOUR_SALARY',    label: 'Labour / Salary' },
   { value: 'ELECTRICITY',      label: 'Electricity Bill' },

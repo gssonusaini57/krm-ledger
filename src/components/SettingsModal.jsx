@@ -1,26 +1,17 @@
 import { useState } from 'react'
-import { X, Plus, Trash2, Pencil, Check, User, Mail } from 'lucide-react'
+import { X, Plus, Trash2, Pencil, User } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { useAuth } from '../context/AuthContext'
 import { OWNER_COLORS } from '../utils/helpers'
 
 const BLANK_EMP = { name: '', type: 'FIXED', salary: '' }
 
 export default function SettingsModal({ onClose }) {
   const { owners, settings, employees = [], updateOwner, updateSettings, addEmployee, updateEmployee, deleteEmployee } = useApp()
-  const { signOut, updateUserEmail, user } = useAuth()
 
-  const [section, setSection]       = useState('company')   // 'company' | 'employees' | 'account'
+  const [section, setSection]       = useState('company')
   const [companyName, setCompanyName] = useState(settings.companyName)
   const [ownerEdits, setOwnerEdits] = useState(owners.map(o => ({ ...o })))
   const [saved, setSaved]           = useState(false)
-
-  // email change form
-  const [newEmail, setNewEmail]     = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [emailUpdating, setEmailUpdating] = useState(false)
-  const [emailError, setEmailError] = useState('')
-  const [signingOut, setSigningOut] = useState(false)
 
   // employee form
   const [empForm, setEmpForm]       = useState(null)   // null = closed, {} = new, {id} = edit
@@ -34,43 +25,6 @@ export default function SettingsModal({ onClose }) {
     ownerEdits.forEach(o => updateOwner(o))
     setSaved(true)
     setTimeout(() => { setSaved(false) }, 1500)
-  }
-
-  const handleSignOut = async () => {
-    setSigningOut(true)
-    try {
-      const result = await signOut()
-      if (result.success) {
-        onClose()
-      } else {
-        console.error('Sign out failed:', result.error)
-        setSigningOut(false)
-        // You could show an error message here if needed
-      }
-    } catch (error) {
-      console.error('Sign out error:', error)
-      setSigningOut(false)
-    }
-  }
-
-  const handleUpdateEmail = async () => {
-    if (!newEmail.trim() || !currentPassword.trim()) return
-    
-    setEmailUpdating(true)
-    setEmailError('')
-    
-    const result = await updateUserEmail(newEmail.trim(), currentPassword)
-    
-    if (result.success) {
-      setNewEmail('')
-      setCurrentPassword('')
-      setEmailError('Email updated successfully!')
-      setTimeout(() => setEmailError(''), 3000)
-    } else {
-      setEmailError(result.error)
-    }
-    
-    setEmailUpdating(false)
   }
 
   const openNewEmp  = () => setEmpForm({ ...BLANK_EMP })
@@ -108,10 +62,9 @@ export default function SettingsModal({ onClose }) {
         </div>
 
         {/* Section tabs */}
-        <div className="grid grid-cols-3 gap-1 mx-6 mt-4 p-1 rounded-2xl bg-gray-100 flex-shrink-0">
+        <div className="grid grid-cols-2 gap-1 mx-6 mt-4 p-1 rounded-2xl bg-gray-100 flex-shrink-0">
           {[
             { key: 'company', label: 'Company', icon: User },
-            { key: 'account', label: 'Account', icon: Mail },
             { key: 'employees', label: 'Staff', icon: User }
           ].map(s => {
             const IconComponent = s.icon
@@ -163,64 +116,6 @@ export default function SettingsModal({ onClose }) {
                 style={{ background: saved ? '#10B981' : 'linear-gradient(135deg,#3B82F6,#6366F1)' }}>
                 {saved ? '✓ Saved!' : 'Save Changes'}
               </button>
-            </>
-          )}
-
-          {/* ── ACCOUNT ── */}
-          {section === 'account' && (
-            <>
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Current Email</label>
-                <div className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-700">
-                  {user?.email || 'Not available'}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Change Email Address</label>
-                <input
-                  type="email"
-                  placeholder="New email address"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 mb-3"
-                />
-                <input
-                  type="password"
-                  placeholder="Current password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-              </div>
-
-              {emailError && (
-                <div className={`text-sm text-center p-3 rounded-xl ${
-                  emailError.includes('successfully') 
-                    ? 'bg-green-50 text-green-700' 
-                    : 'bg-red-50 text-red-700'
-                }`}>
-                  {emailError}
-                </div>
-              )}
-
-              <button
-                onClick={handleUpdateEmail}
-                disabled={emailUpdating || !newEmail.trim() || !currentPassword.trim()}
-                className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg,#3B82F6,#6366F1)' }}
-              >
-                {emailUpdating ? 'Updating...' : 'Update Email'}
-              </button>
-
-              <div className="pt-4 border-t border-gray-100">
-                <button onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg,#EF4444,#F97316)' }}>
-                  {signingOut ? 'Signing Out...' : 'Sign Out'}
-                </button>
-              </div>
             </>
           )}
 

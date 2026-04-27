@@ -11,19 +11,22 @@ import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
   Search, X as XIcon, Wheat, Printer, Users,
   LayoutList, Briefcase, Building2, Package, Receipt,
-  Truck as TruckIcon, ShoppingBag
+  Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 
 const CAT_COLOR = {
   SALARY:'#8B5CF6', LABOUR:'#F97316', BANK:'#06B6D4',
   DEPOT_EXP:'#EC4899', EXPENDITURE:'#EF4444', ASHOK_DEPOT:'#14B8A6',
-  TRUCK:'#F59E0B', PADDY_PURCHASE:'#84CC16', ELECTRICITY:'#3B82F6',
+  TRUCK:'#F59E0B', PANKAJ_PLASH:'#3B82F6', AMAN_PLASH:'#10B981',
+  BROKEN_BUY:'#DC2626', BROKEN_SELL:'#16A34A',
+  PADDY_PURCHASE:'#84CC16', ELECTRICITY:'#3B82F6',
   TRANSPORT:'#F59E0B', MACHINE_MAINTENANCE:'#64748B', GUNNY_BAGS:'#A78BFA',
   DIESEL_FUEL:'#F97316', MISCELLANEOUS:'#94A3B8',
 }
 
-const CATEGORY_TABS = new Set(['SALARY','LABOUR','BANK','DEPOT_EXP','EXPENDITURE','ASHOK_DEPOT','TRUCK'])
+const CATEGORY_TABS       = new Set(['SALARY','LABOUR','BANK','DEPOT_EXP','EXPENDITURE','ASHOK_DEPOT','TRUCK','PANKAJ_PLASH','AMAN_PLASH','BROKEN_BUY'])
+const INCOME_CATEGORY_TABS = new Set(['BROKEN_SELL'])
 
 const NAV_MAIN = [
   { key: 'ALL',   label: 'All',     icon: LayoutList    },
@@ -32,13 +35,17 @@ const NAV_MAIN = [
   { key: 'OWNER', label: 'Partner', icon: Users         },
 ]
 const NAV_EXPENSE = [
-  { key: 'SALARY',      label: 'Salary',  icon: Briefcase  },
-  { key: 'LABOUR',      label: 'Labour',  icon: Briefcase  },
-  { key: 'BANK',        label: 'Bank',    icon: Building2  },
-  { key: 'DEPOT_EXP',   label: 'Depot',   icon: Package    },
-  { key: 'EXPENDITURE', label: 'Expense', icon: Receipt    },
-  { key: 'ASHOK_DEPOT', label: 'Ashok',   icon: ShoppingBag},
-  { key: 'TRUCK',       label: 'Truck',   icon: TruckIcon  },
+  { key: 'SALARY',       label: 'Salary',       icon: Briefcase    },
+  { key: 'LABOUR',       label: 'Labour',       icon: Briefcase    },
+  { key: 'BANK',         label: 'Bank',         icon: Building2    },
+  { key: 'DEPOT_EXP',    label: 'Depot',        icon: Package      },
+  { key: 'EXPENDITURE',  label: 'Expense',      icon: Receipt      },
+  { key: 'ASHOK_DEPOT',  label: 'Ashok',        icon: ShoppingBag  },
+  { key: 'TRUCK',        label: 'Truck',        icon: TruckIcon    },
+  { key: 'PANKAJ_PLASH', label: 'Pankaj Plash', icon: ShoppingBag  },
+  { key: 'AMAN_PLASH',   label: 'Aman Plash',   icon: ShoppingBag  },
+  { key: 'BROKEN_BUY',   label: 'Broken Buy',   icon: TrendingDown },
+  { key: 'BROKEN_SELL',  label: 'Broken Sell',  icon: TrendingUp   },
 ]
 
 function dayLabel(dateStr) {
@@ -248,6 +255,9 @@ function MainApp() {
       else if (CATEGORY_TABS.has(tab)) {
         if (t.type !== TRANSACTION_TYPES.EXPENSE || t.category !== tab) return false
       }
+      else if (INCOME_CATEGORY_TABS.has(tab)) {
+        if (t.type !== TRANSACTION_TYPES.CASH_IN || t.category !== tab) return false
+      }
       if (search.trim()) {
         const q = search.toLowerCase()
         return t.description?.toLowerCase().includes(q) || getCategoryLabel(t.category)?.toLowerCase().includes(q)
@@ -348,12 +358,12 @@ function MainApp() {
       <div className="flex flex-col flex-1" style={{ marginLeft: SIDEBAR_W, marginRight: REPORT_W }}>
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
-        <div className="sticky top-0 z-20 flex items-center justify-center"
-          style={{ background: '#1B5C20', minHeight: 50, position: 'sticky' }}>
-          <span className="text-white font-bold uppercase tracking-widest text-base">
+        <div className="sticky top-0 z-20 flex items-center justify-center px-12 py-3 text-center"
+          style={{ background: '#1B5C20', minHeight: 60 }}>
+          <span className="text-white font-bold uppercase tracking-widest text-sm leading-snug">
             {settings.companyName || 'KRM Rice Mill'}
           </span>
-          <div className="absolute right-3 flex items-center gap-1.5">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             <button onClick={handlePrint}
               className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'rgba(255,255,255,0.12)' }}>
@@ -400,8 +410,8 @@ function MainApp() {
         {/* ── INLINE ADD FORM (right next to sidebar, no popup) ─────────── */}
         <InlineAddForm
           key={tab}
-          defaultMode={CATEGORY_TABS.has(tab) ? 'OUT' : tab === 'IN' ? 'IN' : tab === 'OWNER' ? 'OWNER' : 'IN'}
-          defaultCategory={CATEGORY_TABS.has(tab) ? tab : ''}
+          defaultMode={CATEGORY_TABS.has(tab) ? 'OUT' : INCOME_CATEGORY_TABS.has(tab) ? 'IN' : tab === 'IN' ? 'IN' : tab === 'OWNER' ? 'OWNER' : 'IN'}
+          defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
         />
 
         {/* ── SECTION LABEL + SEARCH ────────────────────────────────────── */}

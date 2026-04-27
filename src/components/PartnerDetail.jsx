@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { X, ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown } from 'lucide-react'
+import { X, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { TRANSACTION_TYPES, formatCurrency, isInflow, getCategoryLabel } from '../utils/helpers'
+import { formatCurrency, isInflow, getCategoryLabel } from '../utils/helpers'
 import { format, isToday, isYesterday } from 'date-fns'
 
 function dayLabel(dateStr) {
@@ -22,17 +22,15 @@ export default function PartnerDetail({ partner, onClose }) {
     [transactions, partner.id]
   )
 
-  // Summary
+  // Summary — total in vs total out for this partner
   const summary = useMemo(() => {
-    let deposited = 0, withdrawn = 0, linkedIn = 0, linkedOut = 0
+    let totalIn = 0, totalOut = 0
     partnerTxns.forEach(t => {
-      if (t.type === TRANSACTION_TYPES.OWNER_DEPOSIT)    deposited  += t.amount
-      if (t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) withdrawn  += t.amount
-      if (t.partnerId === partner.id && t.type === TRANSACTION_TYPES.CASH_IN)  linkedIn  += t.amount
-      if (t.partnerId === partner.id && t.type === TRANSACTION_TYPES.EXPENSE)  linkedOut += t.amount
+      if (isInflow(t.type)) totalIn  += t.amount
+      else                  totalOut += t.amount
     })
-    return { deposited, withdrawn, linkedIn, linkedOut, net: deposited - withdrawn }
-  }, [partnerTxns, partner.id])
+    return { totalIn, totalOut, net: totalIn - totalOut }
+  }, [partnerTxns])
 
   // Group by date
   const grouped = useMemo(() => {
@@ -79,48 +77,26 @@ export default function PartnerDetail({ partner, onClose }) {
             </button>
           </div>
 
-          {/* 4 summary boxes */}
+          {/* 2 summary boxes */}
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white rounded-2xl p-3 shadow-sm">
               <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
                   <ArrowUpRight size={11} color="#10B981" />
                 </div>
-                <p className="text-xs text-gray-400 font-medium">Partner Deposited</p>
+                <p className="text-xs text-gray-400 font-medium">Total Received</p>
               </div>
-              <p className="font-bold text-emerald-600 text-lg">{formatCurrency(summary.deposited, settings.currency)}</p>
+              <p className="font-bold text-emerald-600 text-lg">{formatCurrency(summary.totalIn, settings.currency)}</p>
             </div>
             <div className="bg-white rounded-2xl p-3 shadow-sm">
               <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center">
                   <ArrowDownRight size={11} color="#F43F5E" />
                 </div>
-                <p className="text-xs text-gray-400 font-medium">Partner Withdrew</p>
+                <p className="text-xs text-gray-400 font-medium">Total Paid Out</p>
               </div>
-              <p className="font-bold text-rose-500 text-lg">{formatCurrency(summary.withdrawn, settings.currency)}</p>
+              <p className="font-bold text-rose-500 text-lg">{formatCurrency(summary.totalOut, settings.currency)}</p>
             </div>
-            {summary.linkedIn > 0 && (
-              <div className="bg-white rounded-2xl p-3 shadow-sm">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center">
-                    <TrendingUp size={11} color="#3B82F6" />
-                  </div>
-                  <p className="text-xs text-gray-400 font-medium">Linked Cash In</p>
-                </div>
-                <p className="font-bold text-blue-600 text-lg">{formatCurrency(summary.linkedIn, settings.currency)}</p>
-              </div>
-            )}
-            {summary.linkedOut > 0 && (
-              <div className="bg-white rounded-2xl p-3 shadow-sm">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center">
-                    <TrendingDown size={11} color="#F97316" />
-                  </div>
-                  <p className="text-xs text-gray-400 font-medium">Linked Cash Out</p>
-                </div>
-                <p className="font-bold text-orange-500 text-lg">{formatCurrency(summary.linkedOut, settings.currency)}</p>
-              </div>
-            )}
           </div>
         </div>
 

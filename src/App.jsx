@@ -129,11 +129,11 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
 function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
-  const isOnline = (t) => t.paymentMode === 'ONLINE'
+  const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.linkedCategory === 'BANK' || t.category === 'BANK'
 
   const { bankIn, bankOut } = useMemo(() => ({
-    bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isOnline(t)).reduce((s, t) => s + t.amount, 0),
-    bankOut: transactions.filter(t => t.type === 'EXPENSE'  && isOnline(t)).reduce((s, t) => s + t.amount, 0),
+    bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
+    bankOut: transactions.filter(t => t.type === 'EXPENSE'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
   }), [transactions])
 
   const partnerStats = useMemo(() =>

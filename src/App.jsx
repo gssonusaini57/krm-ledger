@@ -126,7 +126,7 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 }
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
-function ReportPanel({ balance, todayIn, todayOut, monthIn, monthOut, monthFilter, owners, getOwnerBalance, settings, onPartnerClick }) {
+function ReportPanel({ todayIn, todayOut, monthIn, monthOut, monthFilter, owners, getOwnerBalance, settings, onPartnerClick }) {
   const displayIn  = monthFilter ? monthIn  : todayIn
   const displayOut = monthFilter ? monthOut : todayOut
   const periodLabel = monthFilter ? format(new Date(monthFilter+'-01'), 'MMM yyyy') : 'Today'
@@ -139,14 +139,6 @@ function ReportPanel({ balance, todayIn, todayOut, monthIn, monthOut, monthFilte
       <div className="flex items-center justify-center"
         style={{ background: '#1B5C20', minHeight: 50, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <span className="text-white font-bold uppercase tracking-widest text-sm">Report</span>
-      </div>
-
-      {/* Overall Balance */}
-      <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Cash Balance</p>
-        <p className="font-bold text-2xl" style={{ color: balance >= 0 ? '#FBBF24' : '#FB7185' }}>
-          {formatCurrency(balance, settings.currency)}
-        </p>
       </div>
 
       {/* Period summary */}
@@ -374,7 +366,6 @@ function MainApp() {
 
       {/* ── RIGHT REPORT PANEL ───────────────────────────────────────────── */}
       <ReportPanel
-        balance={balance}
         todayIn={todayIn} todayOut={todayOut}
         monthIn={monthIn} monthOut={monthOut}
         monthFilter={monthFilter}

@@ -48,62 +48,67 @@ function dayLabel(dateStr) {
   return format(d, 'dd MMMM yyyy')
 }
 
-// ── Always-visible narrow sidebar ────────────────────────────────────────────
-function Sidebar({ activeTab, onTabChange }) {
+const SIDEBAR_W = 200
+
+// ── Always-visible sidebar ────────────────────────────────────────────────────
+function Sidebar({ activeTab, onTabChange, companyName }) {
   return (
     <div
       className="fixed left-0 top-0 h-full z-30 flex flex-col overflow-y-auto"
-      style={{ width: 56, background: '#0B1426', borderRight: '1px solid rgba(255,255,255,0.06)' }}
+      style={{ width: SIDEBAR_W, background: '#0F1923', borderRight: '1px solid rgba(255,255,255,0.07)' }}
     >
-      {/* Logo */}
-      <div className="flex flex-col items-center py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ background: 'rgba(245,158,11,0.15)' }}>
-          <Wheat size={16} color="#F59E0B" />
+      {/* Brand */}
+      <div className="flex items-center gap-2.5 px-4 py-4"
+        style={{ background: '#1B5C20', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(255,255,255,0.15)' }}>
+          <Wheat size={15} color="#fff" />
         </div>
+        <span className="text-white font-bold text-xs leading-tight truncate">
+          {companyName || 'KRM Rice Mill'}
+        </span>
       </div>
 
       {/* Main nav */}
-      <div className="flex flex-col items-center py-2 gap-0.5">
+      <div className="flex flex-col py-2">
         {NAV_MAIN.map(item => {
           const Icon = item.icon
           const active = activeTab === item.key
           return (
             <button key={item.key} onClick={() => onTabChange(item.key)}
-              className="flex flex-col items-center justify-center w-full py-2.5 gap-1 transition-all"
+              className="flex items-center gap-3 w-full px-4 py-3 transition-all text-left"
               style={active
-                ? { background: 'rgba(99,102,241,0.2)', borderLeft: '3px solid #818CF8' }
-                : { borderLeft: '3px solid transparent' }
+                ? { background: 'rgba(255,255,255,0.08)', borderLeft: '3px solid #818CF8', color: '#A5B4FC' }
+                : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.5)' }
               }>
-              <Icon size={17} color={active ? '#A5B4FC' : 'rgba(255,255,255,0.4)'} />
-              <span style={{ fontSize: 9, fontWeight: 600, color: active ? '#C7D2FE' : 'rgba(255,255,255,0.35)', lineHeight: 1 }}>
-                {item.label}
-              </span>
+              <Icon size={16} color={active ? '#A5B4FC' : 'rgba(255,255,255,0.4)'} />
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{item.label}</span>
             </button>
           )
         })}
       </div>
 
       {/* Divider */}
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 8px' }} />
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 12px' }} />
+      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: 1, padding: '8px 16px 4px', textTransform: 'uppercase' }}>
+        Categories
+      </p>
 
       {/* Expense nav */}
-      <div className="flex flex-col items-center py-2 gap-0.5">
+      <div className="flex flex-col pb-4">
         {NAV_EXPENSE.map(item => {
           const Icon = item.icon
           const active = activeTab === item.key
           const color = CAT_COLOR[item.key] || '#94A3B8'
           return (
             <button key={item.key} onClick={() => onTabChange(item.key)}
-              className="flex flex-col items-center justify-center w-full py-2.5 gap-1 transition-all"
+              className="flex items-center gap-3 w-full px-4 py-2.5 transition-all text-left"
               style={active
-                ? { background: `${color}22`, borderLeft: `3px solid ${color}` }
-                : { borderLeft: '3px solid transparent' }
+                ? { background: `${color}18`, borderLeft: `3px solid ${color}`, color: '#fff' }
+                : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.45)' }
               }>
               <Icon size={14} color={active ? color : 'rgba(255,255,255,0.3)'} />
-              <span style={{ fontSize: 9, fontWeight: 600, color: active ? '#fff' : 'rgba(255,255,255,0.3)', lineHeight: 1 }}>
-                {item.label}
-              </span>
+              <span style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{item.label}</span>
             </button>
           )
         })}
@@ -247,57 +252,56 @@ function MainApp() {
     <div className="min-h-screen flex" style={{ background: '#F1F5F9' }}>
 
       {/* ── ALWAYS-VISIBLE SIDEBAR ───────────────────────────────────────── */}
-      <Sidebar activeTab={tab} onTabChange={switchTab} />
+      <Sidebar activeTab={tab} onTabChange={switchTab} companyName={settings.companyName} />
 
       {/* ── MAIN CONTENT (offset by sidebar) ────────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: 56 }}>
+      <div className="flex flex-col flex-1" style={{ marginLeft: SIDEBAR_W }}>
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
-        <div className="sticky top-0 z-20 flex items-center justify-between px-3 py-2.5"
-          style={{ background: '#0B1426', height: 48 }}>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-white font-bold text-sm truncate">{settings.companyName || 'KRM Rice Mill'}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
+        <div className="sticky top-0 z-20 relative flex items-center justify-center"
+          style={{ background: '#1B5C20', minHeight: 50 }}>
+          <span className="text-white font-bold uppercase tracking-widest text-base">
+            {settings.companyName || 'KRM Rice Mill'}
+          </span>
+          <div className="absolute right-3 flex items-center gap-1.5">
             <button onClick={handlePrint}
               className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.07)' }}>
-              <Printer size={14} color="rgba(255,255,255,0.65)" />
+              style={{ background: 'rgba(255,255,255,0.12)' }}>
+              <Printer size={14} color="rgba(255,255,255,0.85)" />
             </button>
             <button onClick={() => setShowSettings(true)}
               className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.07)' }}>
-              <Settings size={14} color="rgba(255,255,255,0.65)" />
+              style={{ background: 'rgba(255,255,255,0.12)' }}>
+              <Settings size={14} color="rgba(255,255,255,0.85)" />
             </button>
           </div>
         </div>
 
-        {/* ── BALANCE CARD ──────────────────────────────────────────────── */}
+        {/* ── DAILY LEDGER CARD ─────────────────────────────────────────── */}
         <div className="px-3 pt-3 pb-2">
-          <div className="rounded-xl p-3" style={{ background: 'linear-gradient(135deg, #1E293B, #0F172A)' }}>
-            <p className="text-slate-400 text-xs uppercase tracking-widest mb-0.5">Cash Balance</p>
-            <p className={`font-bold mb-2.5 ${balance >= 0 ? 'text-white' : 'text-red-400'}`}
-              style={{ fontSize: 28, lineHeight: 1 }}>
-              {formatCurrency(balance, settings.currency)}
+          <div className="rounded-xl overflow-hidden" style={{ background: '#1B5C20' }}>
+            <p className="text-center text-white font-bold py-2.5 uppercase tracking-widest text-sm"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+              {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') + ' Ledger' : 'Daily Ledger'}
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center gap-1 mb-0.5">
-                  <ArrowUpRight size={9} color="#10B981" />
-                  <p className="text-slate-400" style={{ fontSize: 9 }}>
-                    {monthFilter ? format(new Date(monthFilter+'-01'),'MMM')+' Kamai' : 'Aaj Ki Kamai'}
-                  </p>
-                </div>
-                <p className="text-emerald-400 font-bold text-sm">{formatCurrency(monthFilter ? monthIn : todayIn, settings.currency)}</p>
+            <div className="grid grid-cols-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="py-3 px-2 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
+                <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Total In (+)</p>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 17 }}>
+                  {formatCurrency(monthFilter ? monthIn : todayIn, settings.currency)}
+                </p>
               </div>
-              <div className="rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center gap-1 mb-0.5">
-                  <ArrowDownRight size={9} color="#F43F5E" />
-                  <p className="text-slate-400" style={{ fontSize: 9 }}>
-                    {monthFilter ? format(new Date(monthFilter+'-01'),'MMM')+' Kharcha' : 'Aaj Ka Kharcha'}
-                  </p>
-                </div>
-                <p className="text-rose-400 font-bold text-sm">{formatCurrency(monthFilter ? monthOut : todayOut, settings.currency)}</p>
+              <div className="py-3 px-2 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
+                <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Total Out (-)</p>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 17 }}>
+                  {formatCurrency(monthFilter ? monthOut : todayOut, settings.currency)}
+                </p>
+              </div>
+              <div className="py-3 px-2 text-center">
+                <p className="text-white/60 uppercase mb-1" style={{ fontSize: 10, letterSpacing: 0.5 }}>Net Balance</p>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 17 }}>
+                  {formatCurrency((monthFilter ? monthIn : todayIn) - (monthFilter ? monthOut : todayOut), settings.currency)}
+                </p>
               </div>
             </div>
           </div>

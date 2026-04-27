@@ -1,5 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import Login from './pages/Login'
 import TransactionForm from './components/TransactionForm'
 import InlineAddForm from './components/InlineAddForm'
 import SettingsModal from './components/SettingsModal'
@@ -9,7 +11,7 @@ import {
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight,
-  Pencil, Trash2, Search, X as XIcon, Wheat
+  Pencil, Trash2, Search, X as XIcon, Wheat, LogOut, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 
@@ -50,15 +52,27 @@ function dayLabel(dateStr) {
 // ── Main app ─────────────────────────────────────────────────────────────────
 function MainApp() {
   const { transactions, owners, settings, getCompanyBalance, getOwnerBalance, deleteTransaction } = useApp()
+  const { user, signOut } = useAuth()
 
   const [tab, setTab]               = useState('ALL')
   const [search, setSearch]         = useState('')
+  const [monthFilter, setMonthFilter] = useState(null) // null = All
   const [showSettings, setShowSettings] = useState(false)
   const [editData, setEditData]     = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
 
-  // ── Balance & today stats (owner transactions excluded) ───────────────────
+  // Build list of months that have at least one transaction
+  const availableMonths = useMemo(() => {
+    const seen = new Set()
+    transactions.forEach(t => seen.add(t.date.slice(0, 7)))
+    return Array.from(seen)
+      .sort()
+      .reverse()
+      .map(key => ({ key, label: format(new Date(key + '-01'), 'MMM yy') }))
+  }, [transactions])
+
+  // ── Balance & today/month stats ───────────────────────────────────────────
   const balance = getCompanyBalance()
 
   const { todayIn, todayOut } = useMemo(() => {
@@ -70,10 +84,20 @@ function MainApp() {
     }
   }, [transactions])
 
+  const { monthIn, monthOut } = useMemo(() => {
+    if (!monthFilter) return { monthIn: 0, monthOut: 0 }
+    const monthTxns = transactions.filter(t => t.date.startsWith(monthFilter))
+    return {
+      monthIn:  monthTxns.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0),
+      monthOut: monthTxns.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0),
+    }
+  }, [transactions, monthFilter])
+
   // ── Filtering ─────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return transactions
       .filter(t => {
+        if (monthFilter && !t.date.startsWith(monthFilter)) return false
         if (tab === 'IN')    { if (t.type !== TRANSACTION_TYPES.CASH_IN) return false }
         else if (tab === 'OUT')   { if (t.type !== TRANSACTION_TYPES.EXPENSE) return false }
         else if (tab === 'OWNER') { if (t.type !== TRANSACTION_TYPES.OWNER_DEPOSIT && t.type !== TRANSACTION_TYPES.OWNER_WITHDRAWAL) return false }
@@ -87,7 +111,7 @@ function MainApp() {
         return true
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt))
-  }, [transactions, tab, search])
+  }, [transactions, tab, search, monthFilter])
 
   // ── Group by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
@@ -98,6 +122,10 @@ function MainApp() {
     })
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filtered])
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
 
   const switchTab = (key) => { setTab(key); setSearch('') }
   const openEdit  = (t) => { setEditData(t); setShowEditForm(true) }
@@ -114,23 +142,26 @@ function MainApp() {
         <div className="relative px-6 pt-6 pb-6">
           {/* Top row */}
           <div className="relative flex items-center justify-center mb-6">
+            <div className="absolute left-0 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
+                <span className="text-white text-sm font-bold">
+                  {user?.displayName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="text-left">
+                <p className="text-white text-sm font-medium">
+                  {user?.displayName || 'User'}
+                </p>
+                <p className="text-white/60 text-xs">
+                  {user?.email}
+                </p>
+              </div>
+            </div>
             <button onClick={() => setShowSettings(true)}
               className="absolute right-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
               style={{ background: 'rgba(255,255,255,0.08)' }}>
               <Settings size={16} color="rgba(255,255,255,0.7)" />
             </button>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-                style={{ background: 'linear-gradient(135deg, #F59E0B, #F97316)', boxShadow: '0 4px 16px rgba(245,158,11,0.35)' }}>
-                <Wheat size={26} color="#0F172A" />
-              </div>
-              <div className="text-center">
-                <p className="text-white font-extrabold tracking-wide" style={{ fontSize: 22, letterSpacing: 1 }}>
-                  {settings.companyName}
-                </p>
-                <p className="text-slate-400 text-xs mt-0.5">{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
-              </div>
-            </div>
           </div>
 
           {/* Balance */}
@@ -142,25 +173,33 @@ function MainApp() {
             </p>
           </div>
 
-          {/* Today stats */}
+          {/* Today / Month stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl p-3.5" style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)' }}>
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                   <ArrowUpRight size={11} color="#10B981" />
                 </div>
-                <p className="text-slate-400 text-xs">Aaj Ki Kamai</p>
+                <p className="text-slate-400 text-xs">
+                  {monthFilter ? `${format(new Date(monthFilter + '-01'), 'MMM')} Kamai` : 'Aaj Ki Kamai'}
+                </p>
               </div>
-              <p className="text-emerald-400 font-bold text-xl">{formatCurrency(todayIn, settings.currency)}</p>
+              <p className="text-emerald-400 font-bold text-xl">
+                {formatCurrency(monthFilter ? monthIn : todayIn, settings.currency)}
+              </p>
             </div>
             <div className="rounded-2xl p-3.5" style={{ background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)' }}>
               <div className="flex items-center gap-1.5 mb-2">
                 <div className="w-5 h-5 rounded-full bg-rose-500/20 flex items-center justify-center">
                   <ArrowDownRight size={11} color="#F43F5E" />
                 </div>
-                <p className="text-slate-400 text-xs">Aaj Ka Kharcha</p>
+                <p className="text-slate-400 text-xs">
+                  {monthFilter ? `${format(new Date(monthFilter + '-01'), 'MMM')} Kharcha` : 'Aaj Ka Kharcha'}
+                </p>
               </div>
-              <p className="text-rose-400 font-bold text-xl">{formatCurrency(todayOut, settings.currency)}</p>
+              <p className="text-rose-400 font-bold text-xl">
+                {formatCurrency(monthFilter ? monthOut : todayOut, settings.currency)}
+              </p>
             </div>
           </div>
         </div>
@@ -212,6 +251,37 @@ function MainApp() {
           )}
         </div>
       </div>
+
+      {/* ── MONTH FILTER ─────────────────────────────────────────────────── */}
+      {availableMonths.length > 0 && (
+        <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-thin">
+          <button
+            onClick={() => setMonthFilter(null)}
+            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150
+              ${monthFilter === null ? 'text-white shadow-sm' : 'text-gray-500'}`}
+            style={monthFilter === null
+              ? { background: 'linear-gradient(135deg, #F59E0B, #F97316)' }
+              : { background: '#F1F5F9' }
+            }
+          >
+            All
+          </button>
+          {availableMonths.map(m => (
+            <button
+              key={m.key}
+              onClick={() => setMonthFilter(monthFilter === m.key ? null : m.key)}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-150
+                ${monthFilter === m.key ? 'text-white shadow-sm' : 'text-gray-500'}`}
+              style={monthFilter === m.key
+                ? { background: 'linear-gradient(135deg, #F59E0B, #F97316)' }
+                : { background: '#F1F5F9' }
+              }
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── OWNER CARDS (owner tab only) ─────────────────────────────────── */}
       {tab === 'OWNER' && (
@@ -366,6 +436,34 @@ function MainApp() {
 }
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppWithAuth />
+    </AuthProvider>
+  )
+}
+
+function AppWithAuth() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F1F5F9' }}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#F59E0B' }}>
+            <span className="text-3xl">🌾</span>
+          </div>
+          <p className="text-gray-600 font-semibold text-lg">KRM Ledger</p>
+          <p className="text-gray-400 text-sm mt-1">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Login />
+  }
+
   return (
     <AppProvider>
       <MainApp />

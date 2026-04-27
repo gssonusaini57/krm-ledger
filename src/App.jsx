@@ -127,13 +127,15 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
   )
 }
 
+// Checks both old linkedCategory (string) and new linkedCategories (array)
+const hasLinked = (t, val) =>
+  t.linkedCategory === val ||
+  (Array.isArray(t.linkedCategories) && t.linkedCategories.includes(val))
+
+const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || hasLinked(t, 'BANK')
+
 // ── Right Report Panel ───────────────────────────────────────────────────────
 function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
-  const hasLinked = (t, val) =>
-    t.linkedCategory === val ||
-    (Array.isArray(t.linkedCategories) && t.linkedCategories.includes(val))
-
-  const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || hasLinked(t, 'BANK')
 
   const { bankIn, bankOut } = useMemo(() => ({
     bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),

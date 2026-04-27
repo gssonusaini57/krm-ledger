@@ -1,7 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
 import { AppProvider, useApp } from './context/AppContext'
-import { AuthProvider, useAuth } from './context/AuthContext'
-import Login from './pages/Login'
 import TransactionForm from './components/TransactionForm'
 import InlineAddForm from './components/InlineAddForm'
 import SettingsModal from './components/SettingsModal'
@@ -11,7 +9,7 @@ import {
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight,
-  Pencil, Trash2, Search, X as XIcon, Wheat, LogOut, ChevronLeft, ChevronRight
+  Pencil, Trash2, Search, X as XIcon, Wheat
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 
@@ -52,7 +50,6 @@ function dayLabel(dateStr) {
 // ── Main app ─────────────────────────────────────────────────────────────────
 function MainApp() {
   const { transactions, owners, settings, getCompanyBalance, getOwnerBalance, deleteTransaction } = useApp()
-  const { user, signOut } = useAuth()
 
   const [tab, setTab]               = useState('ALL')
   const [search, setSearch]         = useState('')
@@ -123,10 +120,6 @@ function MainApp() {
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filtered])
 
-  const handleSignOut = async () => {
-    await signOut()
-  }
-
   const switchTab = (key) => { setTab(key); setSearch('') }
   const openEdit  = (t) => { setEditData(t); setShowEditForm(true) }
 
@@ -142,20 +135,11 @@ function MainApp() {
         <div className="relative px-6 pt-6 pb-6">
           {/* Top row */}
           <div className="relative flex items-center justify-center mb-6">
-            <div className="absolute left-0 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
-                <span className="text-white text-sm font-bold">
-                  {user?.displayName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U'}
-                </span>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.2)' }}>
+                <Wheat size={16} color="#F59E0B" />
               </div>
-              <div className="text-left">
-                <p className="text-white text-sm font-medium">
-                  {user?.displayName || 'User'}
-                </p>
-                <p className="text-white/60 text-xs">
-                  {user?.email}
-                </p>
-              </div>
+              <p className="text-white font-bold text-base">{settings.companyName || 'KRM Rice Mill'}</p>
             </div>
             <button onClick={() => setShowSettings(true)}
               className="absolute right-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
@@ -436,34 +420,6 @@ function MainApp() {
 }
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <AppWithAuth />
-    </AuthProvider>
-  )
-}
-
-function AppWithAuth() {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F1F5F9' }}>
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#F59E0B' }}>
-            <span className="text-3xl">🌾</span>
-          </div>
-          <p className="text-gray-600 font-semibold text-lg">KRM Ledger</p>
-          <p className="text-gray-400 text-sm mt-1">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <Login />
-  }
-
   return (
     <AppProvider>
       <MainApp />

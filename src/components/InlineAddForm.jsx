@@ -152,21 +152,23 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           </select>
         )}
 
-        {/* Also in → cross-category chips */}
-        {!isOwnerMode && category && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-gray-400 font-semibold flex-shrink-0">Also in →</span>
-            {ALSO_IN_CATS.filter(c => c.value !== category).map(c => (
-              <button key={c.value} type="button"
-                onClick={() => toggleLinkedCat(c.value)}
-                className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
-                style={linkedCategories.includes(c.value)
-                  ? { borderColor: '#6366F1', background: '#EEF2FF', color: '#4F46E5' }
-                  : { borderColor: '#E2E8F0', color: '#94A3B8' }
-                }>
-                {c.label}
-              </button>
-            ))}
+        {/* Also in → always visible multi-select */}
+        {!isOwnerMode && (
+          <div className="bg-gray-50 border border-gray-200 rounded p-2.5">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Also show in →</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ALSO_IN_CATS.filter(c => c.value !== category).map(c => (
+                <button key={c.value} type="button"
+                  onClick={() => toggleLinkedCat(c.value)}
+                  className="px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"
+                  style={linkedCategories.includes(c.value)
+                    ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
+                    : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }
+                  }>
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

@@ -153,12 +153,20 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
               <input type="checkbox" checked={ownerPaid} onChange={e => setOwnerPaid(e.target.checked)} className="accent-amber-500 w-4 h-4" />
               <span className="text-xs font-semibold text-gray-500">Partner paid?</span>
             </label>
-            {ownerPaid && (
-              <select value={ownerPaidId} onChange={e => setOwnerPaidId(e.target.value)}
-                className="flex-1 min-w-[130px] bg-amber-50 border-2 border-amber-300 rounded px-3 py-1.5 text-xs font-semibold text-amber-800 focus:outline-none">
-                {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            )}
+            {ownerPaid && owners.map(o => (
+              <button key={o.id} type="button" onClick={() => setOwnerPaidId(o.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
+                style={ownerPaidId === o.id
+                  ? { borderColor: o.color || '#F59E0B', background: `${o.color || '#F59E0B'}18`, color: o.color || '#F59E0B' }
+                  : { borderColor: '#E2E8F0', color: '#94A3B8' }
+                }>
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                  style={{ background: o.color || '#F59E0B', fontSize: 9 }}>
+                  {o.name.charAt(0)}
+                </span>
+                {o.name.split(' ')[0]}
+              </button>
+            ))}
           </div>
         )}
 

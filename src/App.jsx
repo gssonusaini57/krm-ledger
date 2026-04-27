@@ -129,6 +129,13 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
 function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
+  const isOnline = (t) => t.paymentMode === 'ONLINE'
+
+  const { bankIn, bankOut } = useMemo(() => ({
+    bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isOnline(t)).reduce((s, t) => s + t.amount, 0),
+    bankOut: transactions.filter(t => t.type === 'EXPENSE'  && isOnline(t)).reduce((s, t) => s + t.amount, 0),
+  }), [transactions])
+
   const partnerStats = useMemo(() =>
     owners.map(owner => {
       const txns = transactions.filter(t => t.ownerId === owner.id || t.partnerId === owner.id)
@@ -147,6 +154,34 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
       <div className="flex items-center justify-center"
         style={{ background: '#1B5C20', minHeight: 50, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <span className="text-white font-bold uppercase tracking-widest text-sm">Report</span>
+      </div>
+
+      {/* Bank Balance */}
+      <div className="px-3 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <p className="text-white/40 text-xs uppercase tracking-wide px-1 mb-2">Bank</p>
+        <div className="rounded-lg p-2.5" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
+              style={{ background: '#3B82F6' }}>B</div>
+            <p className="text-white/80 text-xs font-semibold">Bank Account</p>
+          </div>
+          <div className="space-y-1 pl-1">
+            <div className="flex justify-between items-center">
+              <span className="text-white/40 text-xs">Bank In</span>
+              <span className="font-bold text-xs text-emerald-400">{formatCurrency(bankIn, settings.currency)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/40 text-xs">Bank Out</span>
+              <span className="font-bold text-xs text-rose-400">{formatCurrency(bankOut, settings.currency)}</span>
+            </div>
+            <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <span className="text-white/40 text-xs">Balance</span>
+              <span className="font-bold text-xs" style={{ color: (bankIn - bankOut) >= 0 ? '#FBBF24' : '#FB7185' }}>
+                {formatCurrency(bankIn - bankOut, settings.currency)}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Partner Cash — each partner's own Cash In / Cash Out */}
@@ -310,10 +345,12 @@ function MainApp() {
   const [appliedFrom, setAppliedFrom] = useState(null)
   const [appliedTo, setAppliedTo]   = useState(null)
 
+  const isCashTxn = (t) => !t.paymentMode || t.paymentMode === 'CASH'
+
   const cashInHand = useMemo(() =>
     transactions.reduce((sum, t) => {
-      if (t.type === TRANSACTION_TYPES.CASH_IN)  return sum + t.amount
-      if (t.type === TRANSACTION_TYPES.EXPENSE)  return sum - t.amount
+      if (t.type === TRANSACTION_TYPES.CASH_IN  && isCashTxn(t)) return sum + t.amount
+      if (t.type === TRANSACTION_TYPES.EXPENSE  && isCashTxn(t)) return sum - t.amount
       return sum
     }, 0),
     [transactions]
@@ -330,8 +367,8 @@ function MainApp() {
     const today = new Date().toISOString().slice(0, 10)
     const t2 = transactions.filter(t => t.date === today)
     return {
-      todayIn:  t2.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0),
-      todayOut: t2.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0),
+      todayIn:  t2.filter(t => t.type === TRANSACTION_TYPES.CASH_IN  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      todayOut: t2.filter(t => t.type === TRANSACTION_TYPES.EXPENSE  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
     }
   }, [transactions])
 
@@ -339,8 +376,8 @@ function MainApp() {
     if (!monthFilter) return { monthIn: 0, monthOut: 0 }
     const m = transactions.filter(t => t.date.startsWith(monthFilter))
     return {
-      monthIn:  m.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0),
-      monthOut: m.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0),
+      monthIn:  m.filter(t => t.type === TRANSACTION_TYPES.CASH_IN  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      monthOut: m.filter(t => t.type === TRANSACTION_TYPES.EXPENSE  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
     }
   }, [transactions, monthFilter])
 

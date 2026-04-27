@@ -79,7 +79,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashIn = () => {
     setError('')
     const amt = validate(); if (!amt) return
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: null, linkedCategory: linkedCategory || null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: payMode, ownerId: null, partnerId: null, linkedCategory: linkedCategory || null })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }

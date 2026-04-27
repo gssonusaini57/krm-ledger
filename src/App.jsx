@@ -407,11 +407,6 @@ function MainApp() {
             {settings.companyName || 'KRM Rice Mill'}
           </span>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-            <button onClick={handlePrint}
-              className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.12)' }}>
-              <Printer size={14} color="rgba(255,255,255,0.85)" />
-            </button>
             <button onClick={() => setShowSettings(true)}
               className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'rgba(255,255,255,0.12)' }}>
@@ -423,10 +418,14 @@ function MainApp() {
         {/* ── DAILY LEDGER CARD ─────────────────────────────────────────── */}
         <div className="px-3 pt-3 pb-2">
           <div className="rounded-xl overflow-hidden" style={{ background: '#1B5C20' }}>
-            <p className="text-center text-white font-bold py-2.5 uppercase tracking-widest text-sm"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-              {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash In Hand'}
-            </p>
+            <div className="text-center py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
+              <p className="text-white/70 uppercase tracking-widest font-bold mb-1" style={{ fontSize: 11 }}>
+                {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash In Hand'}
+              </p>
+              <p className="font-bold text-yellow-400" style={{ fontSize: 26, lineHeight: 1 }}>
+                {formatCurrency(balance, settings.currency)}
+              </p>
+            </div>
             <div className="grid grid-cols-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="py-4 px-4 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
                 <p className="text-white/60 uppercase mb-1" style={{ fontSize: 11, letterSpacing: 0.5 }}>Total In (+)</p>

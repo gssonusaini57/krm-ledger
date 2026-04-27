@@ -49,6 +49,7 @@ function dayLabel(dateStr) {
 }
 
 const SIDEBAR_W = 200
+const REPORT_W  = 200
 
 // ── Always-visible sidebar ────────────────────────────────────────────────────
 function Sidebar({ activeTab, onTabChange, companyName }) {
@@ -112,6 +113,83 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// ── Right Report Panel ───────────────────────────────────────────────────────
+function ReportPanel({ balance, todayIn, todayOut, monthIn, monthOut, monthFilter, owners, getOwnerBalance, settings, onPartnerClick }) {
+  const displayIn  = monthFilter ? monthIn  : todayIn
+  const displayOut = monthFilter ? monthOut : todayOut
+  const periodLabel = monthFilter ? format(new Date(monthFilter+'-01'), 'MMM yyyy') : 'Today'
+
+  return (
+    <div className="fixed right-0 top-0 h-full z-30 flex flex-col overflow-y-auto"
+      style={{ width: REPORT_W, background: '#0F1923', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
+
+      {/* Header */}
+      <div className="flex items-center justify-center"
+        style={{ background: '#1B5C20', minHeight: 50, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <span className="text-white font-bold uppercase tracking-widest text-sm">Report</span>
+      </div>
+
+      {/* Overall Balance */}
+      <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <p className="text-white/40 text-xs uppercase tracking-wide mb-1">Cash Balance</p>
+        <p className="font-bold text-2xl" style={{ color: balance >= 0 ? '#FBBF24' : '#FB7185' }}>
+          {formatCurrency(balance, settings.currency)}
+        </p>
+      </div>
+
+      {/* Period summary */}
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <p className="text-white/40 text-xs uppercase tracking-wide mb-2">{periodLabel}</p>
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-white/50 text-xs">Cash In</span>
+            <span className="font-bold text-sm text-emerald-400">{formatCurrency(displayIn, settings.currency)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-white/50 text-xs">Cash Out</span>
+            <span className="font-bold text-sm text-rose-400">{formatCurrency(displayOut, settings.currency)}</span>
+          </div>
+          <div className="flex justify-between items-center pt-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            <span className="text-white/50 text-xs font-semibold">Net</span>
+            <span className="font-bold text-sm" style={{ color: (displayIn - displayOut) >= 0 ? '#FBBF24' : '#FB7185' }}>
+              {formatCurrency(displayIn - displayOut, settings.currency)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Partners */}
+      <div className="px-4 py-3">
+        <p className="text-white/40 text-xs uppercase tracking-wide mb-2">Partners</p>
+        <div className="space-y-1.5">
+          {owners.map((owner, i) => {
+            const bal = getOwnerBalance(owner.id)
+            const color = owner.color || OWNER_COLORS[i]
+            return (
+              <div key={owner.id} onClick={() => onPartnerClick(owner)}
+                className="flex items-center gap-2.5 cursor-pointer rounded-lg p-2 transition-all"
+                style={{ background: 'rgba(255,255,255,0.04)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}>
+                <div className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+                  style={{ background: color }}>
+                  {owner.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/70 text-xs truncate">{owner.name.split(' ')[0]}</p>
+                  <p className="font-bold text-xs" style={{ color: bal >= 0 ? '#34D399' : '#FB7185' }}>
+                    {formatCurrency(Math.abs(bal), settings.currency)}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
@@ -254,12 +332,24 @@ function MainApp() {
       {/* ── ALWAYS-VISIBLE SIDEBAR ───────────────────────────────────────── */}
       <Sidebar activeTab={tab} onTabChange={switchTab} companyName={settings.companyName} />
 
-      {/* ── MAIN CONTENT (offset by sidebar) ────────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: SIDEBAR_W }}>
+      {/* ── RIGHT REPORT PANEL ───────────────────────────────────────────── */}
+      <ReportPanel
+        balance={balance}
+        todayIn={todayIn} todayOut={todayOut}
+        monthIn={monthIn} monthOut={monthOut}
+        monthFilter={monthFilter}
+        owners={owners}
+        getOwnerBalance={getOwnerBalance}
+        settings={settings}
+        onPartnerClick={setSelectedPartner}
+      />
+
+      {/* ── MAIN CONTENT (between both sidebars) ────────────────────────── */}
+      <div className="flex flex-col flex-1" style={{ marginLeft: SIDEBAR_W, marginRight: REPORT_W }}>
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
-        <div className="sticky top-0 z-20 relative flex items-center justify-center"
-          style={{ background: '#1B5C20', minHeight: 50 }}>
+        <div className="sticky top-0 z-20 flex items-center justify-center"
+          style={{ background: '#1B5C20', minHeight: 50, position: 'sticky' }}>
           <span className="text-white font-bold uppercase tracking-widest text-base">
             {settings.companyName || 'KRM Rice Mill'}
           </span>

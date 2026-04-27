@@ -50,9 +50,11 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
   const allEmps      = [...fixedEmps, ...variableEmps]
 
+  const defaultLinked = alsoInValues.includes(currentTab) ? [currentTab] : []
+
   const reset = () => {
     setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
-    setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCats([])
+    setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCats(defaultLinked)
   }
 
   const toggleLinkedCat = (val) =>
@@ -143,7 +145,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
         {/* Category */}
         {!isOwnerMode && (
-          <select value={category} onChange={e => { setCategory(e.target.value); setLinkedCats([]) }}
+          <select value={category} onChange={e => { setCategory(e.target.value); setLinkedCats(defaultLinked) }}
             className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
             <option value="">-- Direct Entry --</option>
             <optgroup label="Cash In Categories">

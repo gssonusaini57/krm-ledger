@@ -357,10 +357,12 @@ function MainApp() {
         if (!isP && !isL) return false
       }
       else if (CATEGORY_TABS.has(tab)) {
-        if (t.type !== TRANSACTION_TYPES.EXPENSE || t.category !== tab) return false
+        if (t.type !== TRANSACTION_TYPES.EXPENSE) return false
+        if (t.category !== tab && t.linkedCategory !== tab) return false
       }
       else if (INCOME_CATEGORY_TABS.has(tab)) {
-        if (t.type !== TRANSACTION_TYPES.CASH_IN || t.category !== tab) return false
+        if (t.type !== TRANSACTION_TYPES.CASH_IN) return false
+        if (t.category !== tab && t.linkedCategory !== tab) return false
       }
       if (search.trim()) {
         const q = search.toLowerCase()

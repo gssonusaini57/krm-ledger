@@ -2,6 +2,21 @@ import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
 
+// Sidebar categories shown as "Also in" chips
+const ALSO_IN_CATS = [
+  { value: 'SALARY',       label: 'Salary'       },
+  { value: 'LABOUR',       label: 'Labour'       },
+  { value: 'BANK',         label: 'Bank'         },
+  { value: 'DEPOT_EXP',    label: 'Depot'        },
+  { value: 'EXPENDITURE',  label: 'Expenditure'  },
+  { value: 'ASHOK_DEPOT',  label: 'Ashok Depot'  },
+  { value: 'TRUCK',        label: 'Truck'        },
+  { value: 'PANKAJ_PLASH', label: 'Pankaj Plash' },
+  { value: 'AMAN_PLASH',   label: 'Aman Plash'   },
+  { value: 'BROKEN_BUY',   label: 'Broken Buy'   },
+  { value: 'BROKEN_SELL',  label: 'Broken Sell'  },
+]
+
 // Generate 2-3 char shortcut from employee name (e.g. "Ramesh Kumar" → "rk")
 function getShortcut(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -21,8 +36,9 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const [ownerId, setOwnerId]         = useState(owners[0]?.id || '')
   const [ownerPaid, setOwnerPaid]     = useState(false)
   const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
-  const [employeeId, setEmployeeId]   = useState('')
-  const [date, setDate]               = useState(todayISO())
+  const [employeeId, setEmployeeId]     = useState('')
+  const [linkedCategory, setLinkedCat] = useState('')
+  const [date, setDate]                = useState(todayISO())
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState(false)
   const [lastAction, setLastAction]   = useState('')
@@ -33,7 +49,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
   const reset = () => {
     setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
-    setPayMode('CASH'); setDate(todayISO()); setEmployeeId('')
+    setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCat('')
   }
 
   // Fill form from employee object
@@ -64,7 +80,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashIn = () => {
     setError('')
     const amt = validate(); if (!amt) return
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: '', ownerId: null, partnerId: null, linkedCategory: linkedCategory || null })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
@@ -73,7 +89,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setError('')
     const amt = validate(); if (!amt) return
     if (ownerPaid && !ownerPaidId) { setError('Select which partner paid'); return }
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null, employeeId: employeeId || null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null, employeeId: employeeId || null, linkedCategory: linkedCategory || null })
     if (ownerPaid && ownerPaidId) {
       addTransaction({
         date, amount: amt,
@@ -122,7 +138,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
         {/* Category */}
         {!isOwnerMode && (
-          <select value={category} onChange={e => setCategory(e.target.value)}
+          <select value={category} onChange={e => { setCategory(e.target.value); setLinkedCat('') }}
             className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
             <option value="">-- Direct Entry --</option>
             <optgroup label="Cash In Categories">
@@ -132,6 +148,24 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
               {EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </optgroup>
           </select>
+        )}
+
+        {/* Also in → cross-category chips */}
+        {!isOwnerMode && category && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-400 font-semibold flex-shrink-0">Also in →</span>
+            {ALSO_IN_CATS.filter(c => c.value !== category).map(c => (
+              <button key={c.value} type="button"
+                onClick={() => setLinkedCat(prev => prev === c.value ? '' : c.value)}
+                className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
+                style={linkedCategory === c.value
+                  ? { borderColor: '#6366F1', background: '#EEF2FF', color: '#4F46E5' }
+                  : { borderColor: '#E2E8F0', color: '#94A3B8' }
+                }>
+                {c.label}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Description */}

@@ -2,6 +2,13 @@ import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
 
+// Generate 2-3 char shortcut from employee name (e.g. "Ramesh Kumar" → "rk")
+function getShortcut(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return parts.map(p => p[0]).join('').toLowerCase()
+  return name.slice(0, 2).toLowerCase()
+}
+
 export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = '' }) {
   const { owners, employees = [], addTransaction } = useApp()
 
@@ -22,10 +29,29 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
   const fixedEmps    = employees.filter(e => e.type === 'FIXED')
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
+  const allEmps      = [...fixedEmps, ...variableEmps]
 
   const reset = () => {
     setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
     setPayMode('CASH'); setDate(todayISO()); setEmployeeId('')
+  }
+
+  // Fill form from employee object
+  const fillEmployee = (emp) => {
+    const isSalary = emp.type === 'FIXED'
+    setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
+    if (isSalary && emp.salary) setAmount(String(emp.salary))
+    setEmployeeId(emp.id)
+    setCategory(isSalary ? 'SALARY' : 'LABOUR')
+  }
+
+  // Description change — check if typed text matches a shortcut
+  const handleDescChange = (val) => {
+    setDesc(val)
+    const typed = val.trim().toLowerCase()
+    if (!typed) return
+    const match = allEmps.find(e => getShortcut(e.name) === typed)
+    if (match) fillEmployee(match)
   }
 
   const validate = () => {
@@ -71,6 +97,12 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setTimeout(() => setSuccess(false), 1200)
   }
 
+  // Placeholder shows available employee shortcuts
+  const shortcutHints = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
+  const descPlaceholder = shortcutHints
+    ? `Shortcut: ${shortcutHints}`
+    : 'Details (bk, st, lb, tr)...'
+
   return (
     <div className="mx-4 my-3 overflow-hidden shadow border border-gray-200 bg-white rounded-lg">
       <div className="px-4 pb-4 pt-4 space-y-2.5">
@@ -104,36 +136,43 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
         {/* Description */}
         <input
-          type="text" placeholder="Details (bk, st, lb, tr)..."
-          value={description} onChange={e => setDesc(e.target.value)}
+          type="text" placeholder={descPlaceholder}
+          value={description} onChange={e => handleDescChange(e.target.value)}
           className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
         />
 
-        {/* Employee quick-pick for Salary / Labour */}
+        {/* Employee quick-pick for Salary / Labour — shows shortcut badge */}
         {!isOwnerMode && (category === 'SALARY' || category === 'LABOUR') && (() => {
           const isSalary = category === 'SALARY'
           const pool = isSalary ? fixedEmps : variableEmps
           if (!pool.length) return null
           return (
             <div className="flex flex-wrap gap-2">
-              {pool.map(emp => (
-                <button key={emp.id} type="button"
-                  onClick={() => {
-                    setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
-                    if (isSalary && emp.salary) setAmount(String(emp.salary))
-                    setEmployeeId(emp.id)
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
-                  style={{ borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }}
-                >
-                  <span className="w-5 h-5 rounded flex items-center justify-center text-white font-bold text-xs"
-                    style={{ background: isSalary ? '#8B5CF6' : '#F97316' }}>
-                    {emp.name.charAt(0).toUpperCase()}
-                  </span>
-                  {emp.name}
-                  {isSalary && emp.salary ? <span className="opacity-60">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
-                </button>
-              ))}
+              {pool.map(emp => {
+                const sc = getShortcut(emp.name)
+                const active = employeeId === emp.id
+                return (
+                  <button key={emp.id} type="button"
+                    onClick={() => fillEmployee(emp)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
+                    style={active
+                      ? { borderColor: isSalary ? '#7C3AED' : '#EA580C', background: isSalary ? '#8B5CF6' : '#F97316', color: '#fff' }
+                      : { borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }
+                    }
+                  >
+                    <span className="w-5 h-5 rounded flex items-center justify-center text-white font-bold text-xs"
+                      style={{ background: isSalary ? '#8B5CF6' : '#F97316' }}>
+                      {emp.name.charAt(0).toUpperCase()}
+                    </span>
+                    {emp.name.split(' ')[0]}
+                    {isSalary && emp.salary ? <span className="opacity-70">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
+                    <span className="ml-0.5 px-1 py-0.5 rounded font-mono text-white"
+                      style={{ background: 'rgba(0,0,0,0.2)', fontSize: 9 }}>
+                      {sc}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           )
         })()}

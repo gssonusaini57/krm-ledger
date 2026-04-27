@@ -52,11 +52,10 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCat('')
   }
 
-  // Fill form from employee object
+  // Fill form from employee object — amount stays manual
   const fillEmployee = (emp) => {
     const isSalary = emp.type === 'FIXED'
     setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
-    if (isSalary && emp.salary) setAmount(String(emp.salary))
     setEmployeeId(emp.id)
     setCategory(isSalary ? 'SALARY' : 'LABOUR')
   }
@@ -199,7 +198,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
                       {emp.name.charAt(0).toUpperCase()}
                     </span>
                     {emp.name.split(' ')[0]}
-                    {isSalary && emp.salary ? <span className="opacity-70">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
+                    {isSalary && emp.salary ? <span className="opacity-60">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
                     <span className="ml-0.5 px-1 py-0.5 rounded font-mono text-white"
                       style={{ background: 'rgba(0,0,0,0.2)', fontSize: 9 }}>
                       {sc}

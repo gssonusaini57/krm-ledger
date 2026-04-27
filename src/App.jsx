@@ -129,7 +129,11 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
 function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
-  const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.linkedCategory === 'BANK' || t.category === 'BANK'
+  const hasLinked = (t, val) =>
+    t.linkedCategory === val ||
+    (Array.isArray(t.linkedCategories) && t.linkedCategories.includes(val))
+
+  const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || hasLinked(t, 'BANK')
 
   const { bankIn, bankOut } = useMemo(() => ({
     bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
@@ -395,11 +399,11 @@ function MainApp() {
       }
       else if (CATEGORY_TABS.has(tab)) {
         if (t.type !== TRANSACTION_TYPES.EXPENSE) return false
-        if (t.category !== tab && t.linkedCategory !== tab) return false
+        if (t.category !== tab && !hasLinked(t, tab)) return false
       }
       else if (INCOME_CATEGORY_TABS.has(tab)) {
         if (t.type !== TRANSACTION_TYPES.CASH_IN) return false
-        if (t.category !== tab && t.linkedCategory !== tab) return false
+        if (t.category !== tab && !hasLinked(t, tab)) return false
       }
       if (search.trim()) {
         const q = search.toLowerCase()

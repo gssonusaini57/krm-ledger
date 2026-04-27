@@ -37,7 +37,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const [ownerPaid, setOwnerPaid]     = useState(false)
   const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
   const [employeeId, setEmployeeId]     = useState('')
-  const [linkedCategory, setLinkedCat] = useState('')
+  const [linkedCategories, setLinkedCats] = useState([])
   const [date, setDate]                = useState(todayISO())
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState(false)
@@ -49,8 +49,11 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
   const reset = () => {
     setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
-    setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCat('')
+    setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCats([])
   }
+
+  const toggleLinkedCat = (val) =>
+    setLinkedCats(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])
 
   // Fill form from employee object — amount stays manual
   const fillEmployee = (emp) => {
@@ -79,7 +82,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashIn = () => {
     setError('')
     const amt = validate(); if (!amt) return
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: payMode, ownerId: null, partnerId: null, linkedCategory: linkedCategory || null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: payMode, ownerId: null, partnerId: null, linkedCategories: linkedCategories.length ? linkedCategories : null })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
@@ -88,7 +91,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setError('')
     const amt = validate(); if (!amt) return
     if (ownerPaid && !ownerPaidId) { setError('Select which partner paid'); return }
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null, employeeId: employeeId || null, linkedCategory: linkedCategory || null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null, employeeId: employeeId || null, linkedCategories: linkedCategories.length ? linkedCategories : null })
     if (ownerPaid && ownerPaidId) {
       addTransaction({
         date, amount: amt,
@@ -137,7 +140,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
         {/* Category */}
         {!isOwnerMode && (
-          <select value={category} onChange={e => { setCategory(e.target.value); setLinkedCat('') }}
+          <select value={category} onChange={e => { setCategory(e.target.value); setLinkedCats([]) }}
             className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
             <option value="">-- Direct Entry --</option>
             <optgroup label="Cash In Categories">
@@ -155,9 +158,9 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
             <span className="text-xs text-gray-400 font-semibold flex-shrink-0">Also in →</span>
             {ALSO_IN_CATS.filter(c => c.value !== category).map(c => (
               <button key={c.value} type="button"
-                onClick={() => setLinkedCat(prev => prev === c.value ? '' : c.value)}
+                onClick={() => toggleLinkedCat(c.value)}
                 className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
-                style={linkedCategory === c.value
+                style={linkedCategories.includes(c.value)
                   ? { borderColor: '#6366F1', background: '#EEF2FF', color: '#4F46E5' }
                   : { borderColor: '#E2E8F0', color: '#94A3B8' }
                 }>

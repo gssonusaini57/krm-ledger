@@ -425,7 +425,7 @@ function MainApp() {
           <div className="rounded-xl overflow-hidden" style={{ background: '#1B5C20' }}>
             <p className="text-center text-white font-bold py-2.5 uppercase tracking-widest text-sm"
               style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-              {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') + ' Ledger' : 'Daily Ledger'}
+              {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash In Hand'}
             </p>
             <div className="grid grid-cols-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="py-4 px-4 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>

@@ -126,11 +126,7 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 }
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
-function ReportPanel({ todayIn, todayOut, monthIn, monthOut, monthFilter, owners, transactions, settings, onPartnerClick }) {
-  const displayIn  = monthFilter ? monthIn  : todayIn
-  const displayOut = monthFilter ? monthOut : todayOut
-  const periodLabel = monthFilter ? format(new Date(monthFilter+'-01'), 'MMM yyyy') : 'Today'
-
+function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
   const partnerStats = useMemo(() =>
     owners.map(owner => {
       const txns = transactions.filter(t => t.ownerId === owner.id || t.partnerId === owner.id)
@@ -149,27 +145,6 @@ function ReportPanel({ todayIn, todayOut, monthIn, monthOut, monthFilter, owners
       <div className="flex items-center justify-center"
         style={{ background: '#1B5C20', minHeight: 50, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <span className="text-white font-bold uppercase tracking-widest text-sm">Report</span>
-      </div>
-
-      {/* Period summary */}
-      <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-white/40 text-xs uppercase tracking-wide mb-2">{periodLabel}</p>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-white/50 text-xs">Cash In</span>
-            <span className="font-bold text-sm text-emerald-400">{formatCurrency(displayIn, settings.currency)}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-white/50 text-xs">Cash Out</span>
-            <span className="font-bold text-sm text-rose-400">{formatCurrency(displayOut, settings.currency)}</span>
-          </div>
-          <div className="flex justify-between items-center pt-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-            <span className="text-white/50 text-xs font-semibold">Net</span>
-            <span className="font-bold text-sm" style={{ color: (displayIn - displayOut) >= 0 ? '#FBBF24' : '#FB7185' }}>
-              {formatCurrency(displayIn - displayOut, settings.currency)}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* Partner Cash — each partner's own Cash In / Cash Out */}
@@ -395,9 +370,6 @@ function MainApp() {
 
       {/* ── RIGHT REPORT PANEL ───────────────────────────────────────────── */}
       <ReportPanel
-        todayIn={todayIn} todayOut={todayOut}
-        monthIn={monthIn} monthOut={monthOut}
-        monthFilter={monthFilter}
         owners={owners}
         transactions={transactions}
         settings={settings}

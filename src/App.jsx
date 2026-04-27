@@ -5,11 +5,11 @@ import TransactionForm from './components/TransactionForm'
 import SettingsModal from './components/SettingsModal'
 import PartnerDetail from './components/PartnerDetail'
 import {
-  formatCurrency, isInflow, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel
+  formatCurrency, isInflow, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
-  Search, X as XIcon, Wheat, Printer, Users,
+  Search, X as XIcon, Wheat, Printer, Users, FileText,
   LayoutList, Briefcase, Building2, Package, Receipt,
   Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp
 } from 'lucide-react'
@@ -214,6 +214,10 @@ function MainApp() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [selectedPartner, setSelectedPartner] = useState(null)
+  const [fromDate, setFromDate]     = useState(todayISO())
+  const [toDate, setToDate]         = useState(todayISO())
+  const [appliedFrom, setAppliedFrom] = useState(null)
+  const [appliedTo, setAppliedTo]   = useState(null)
 
   const balance = getCompanyBalance()
 
@@ -244,7 +248,9 @@ function MainApp() {
 
   const filtered = useMemo(() => {
     return transactions.filter(t => {
-      if (monthFilter && !t.date.startsWith(monthFilter)) return false
+      if (appliedFrom) {
+        if (t.date < appliedFrom || t.date > appliedTo) return false
+      } else if (monthFilter && !t.date.startsWith(monthFilter)) return false
       if (tab === 'IN')    { if (t.type !== TRANSACTION_TYPES.CASH_IN) return false }
       else if (tab === 'OUT')   { if (t.type !== TRANSACTION_TYPES.EXPENSE) return false }
       else if (tab === 'OWNER') {
@@ -264,7 +270,7 @@ function MainApp() {
       }
       return true
     }).sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt))
-  }, [transactions, tab, search, monthFilter])
+  }, [transactions, tab, search, monthFilter, appliedFrom, appliedTo])
 
   const grouped = useMemo(() => {
     const map = {}
@@ -274,11 +280,25 @@ function MainApp() {
 
   const switchTab = (key) => { setTab(key); setSearch('') }
 
-  const handlePrint = () => {
+  const handleFilterApply = () => {
+    setAppliedFrom(fromDate)
+    setAppliedTo(toDate)
+    setMonthFilter(null)
+  }
+  const handleFilterReset = () => {
+    setAppliedFrom(null)
+    setAppliedTo(null)
+    setFromDate(todayISO())
+    setToDate(todayISO())
+  }
+
+  const buildReportHTML = () => {
     const allNav = [...NAV_MAIN, ...NAV_EXPENSE]
-    const periodLabel = monthFilter
-      ? format(new Date(monthFilter + '-01'), 'MMMM yyyy')
-      : allNav.find(n => n.key === tab)?.label || 'All Transactions'
+    const periodLabel = appliedFrom
+      ? `${appliedFrom} to ${appliedTo}`
+      : monthFilter
+        ? format(new Date(monthFilter + '-01'), 'MMMM yyyy')
+        : allNav.find(n => n.key === tab)?.label || 'All Transactions'
     const totalIn  = filtered.filter(t => t.type === TRANSACTION_TYPES.CASH_IN).reduce((s, t) => s + t.amount, 0)
     const totalOut = filtered.filter(t => t.type === TRANSACTION_TYPES.EXPENSE).reduce((s, t) => s + t.amount, 0)
     const rows = [...filtered].sort((a, b) => a.date.localeCompare(b.date)).map(t => {
@@ -289,8 +309,7 @@ function MainApp() {
         <td style="color:#10B981;text-align:right">${inflow?'₹'+t.amount.toLocaleString('en-IN'):''}</td>
         <td style="color:#F43F5E;text-align:right">${!inflow?'₹'+t.amount.toLocaleString('en-IN'):''}</td></tr>`
     }).join('')
-    const win = window.open('', '_blank')
-    win.document.write(`<!DOCTYPE html><html><head><title>KRM Ledger</title>
+    return `<!DOCTYPE html><html><head><title>${settings.companyName||'KRM Ledger'}</title>
     <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px}h2{margin:0 0 4px}
     .s{display:flex;gap:16px;margin:16px 0}.b{padding:12px 20px;border-radius:8px}
     table{width:100%;border-collapse:collapse}th{background:#1E293B;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase}
@@ -302,8 +321,19 @@ function MainApp() {
       <div class="b" style="background:#EFF6FF"><div style="font-size:10px;color:#2563EB;font-weight:bold">NET</div><div style="font-size:18px;font-weight:bold;color:#3B82F6">₹${(totalIn-totalOut).toLocaleString('en-IN')}</div></div>
     </div>
     <table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Cash In</th><th style="text-align:right">Cash Out</th></tr></thead>
-    <tbody>${rows}</tbody></table></body></html>`)
+    <tbody>${rows}</tbody></table></body></html>`
+  }
+
+  const handlePrint = () => {
+    const win = window.open('', '_blank')
+    win.document.write(buildReportHTML())
     win.document.close(); win.focus(); setTimeout(() => win.print(), 300)
+  }
+
+  const handlePDF = () => {
+    const win = window.open('', '_blank')
+    win.document.write(buildReportHTML())
+    win.document.close(); win.focus()
   }
 
   const handleDayPrint = (date, txns) => {
@@ -414,44 +444,87 @@ function MainApp() {
           defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
         />
 
-        {/* ── SECTION LABEL + SEARCH ────────────────────────────────────── */}
-        <div className="px-3 pt-1 pb-2">
+        {/* ── SEARCH + DATE FILTER + PDF/PRINT ─────────────────────────── */}
+        <div className="px-3 pt-2 pb-1">
+          {/* Section label */}
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-1 h-4 rounded-full" style={{ background: CAT_COLOR[tab] || '#6366F1' }} />
+            <div className="w-1 h-4 rounded" style={{ background: CAT_COLOR[tab] || '#1B5C20' }} />
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{activeLabel}</span>
-            {monthFilter && (
-              <span className="text-xs px-2 py-0.5 rounded-full font-semibold ml-auto"
+            {appliedFrom && (
+              <span className="text-xs px-2 py-0.5 rounded font-semibold ml-auto"
+                style={{ background: '#DCFCE7', color: '#166534' }}>
+                {appliedFrom} – {appliedTo}
+              </span>
+            )}
+            {!appliedFrom && monthFilter && (
+              <span className="text-xs px-2 py-0.5 rounded font-semibold ml-auto"
                 style={{ background: '#FEF3C7', color: '#92400E' }}>
                 {format(new Date(monthFilter+'-01'), 'MMM yyyy')}
               </span>
             )}
           </div>
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Search..."
-              value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-7 py-2 bg-white rounded-xl text-sm text-gray-700 placeholder-gray-400 border border-gray-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all" />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400">
-                <XIcon size={13} />
+
+          {/* Card */}
+          <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5">
+            {/* Row 1: Search + PDF + Print */}
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" placeholder="Search description..."
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-7 py-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-100 transition-all" />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400">
+                    <XIcon size={13} />
+                  </button>
+                )}
+              </div>
+              <button onClick={handlePDF}
+                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold text-white flex-shrink-0"
+                style={{ background: '#DC2626' }}>
+                <FileText size={13} /> PDF
               </button>
-            )}
+              <button onClick={handlePrint}
+                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold text-white flex-shrink-0"
+                style={{ background: '#3B82F6' }}>
+                <Printer size={13} /> Print
+              </button>
+            </div>
+
+            {/* Row 2: Date range filter */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
+              <span className="text-xs text-gray-400 font-medium">to</span>
+              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
+              <button onClick={handleFilterApply}
+                className="px-4 py-1.5 rounded text-xs font-bold text-white transition-all active:scale-95"
+                style={{ background: '#1B5C20' }}>
+                Filter
+              </button>
+              <button onClick={handleFilterReset}
+                className="px-2 py-1.5 text-xs font-bold transition-all"
+                style={{ color: '#1B5C20' }}>
+                Reset
+              </button>
+            </div>
           </div>
         </div>
 
         {/* ── MONTH FILTER ──────────────────────────────────────────────── */}
         {availableMonths.length > 0 && (
-          <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-thin">
-            <button onClick={() => setMonthFilter(null)}
-              className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
-              style={monthFilter === null
-                ? { background: '#1E293B', color: '#fff' }
+          <div className="flex gap-1.5 px-3 py-2 overflow-x-auto scrollbar-thin">
+            <button onClick={() => { setMonthFilter(null); handleFilterReset() }}
+              className="flex-shrink-0 px-2.5 py-1 rounded text-xs font-semibold transition-all"
+              style={!monthFilter && !appliedFrom
+                ? { background: '#1B5C20', color: '#fff' }
                 : { background: '#E2E8F0', color: '#64748B' }}>
               All
             </button>
             {availableMonths.map(m => (
-              <button key={m.key} onClick={() => setMonthFilter(monthFilter === m.key ? null : m.key)}
-                className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+              <button key={m.key} onClick={() => { setMonthFilter(monthFilter === m.key ? null : m.key); setAppliedFrom(null); setAppliedTo(null) }}
+                className="flex-shrink-0 px-2.5 py-1 rounded text-xs font-semibold transition-all"
                 style={monthFilter === m.key
                   ? { background: '#F59E0B', color: '#fff' }
                   : { background: '#E2E8F0', color: '#64748B' }}>

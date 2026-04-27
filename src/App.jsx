@@ -575,6 +575,7 @@ function MainApp() {
             key={tab}
             defaultMode={CATEGORY_TABS.has(tab) ? 'OUT' : INCOME_CATEGORY_TABS.has(tab) ? 'IN' : tab === 'IN' ? 'IN' : tab === 'OWNER' ? 'OWNER' : 'IN'}
             defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
+            currentTab={tab}
           />
         )}
 

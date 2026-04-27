@@ -24,7 +24,7 @@ function getShortcut(name) {
   return name.slice(0, 2).toLowerCase()
 }
 
-export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = '' }) {
+export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = '', currentTab = '' }) {
   const { owners, employees = [], addTransaction } = useApp()
 
   const isOwnerMode = defaultMode === 'OWNER'
@@ -37,7 +37,10 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const [ownerPaid, setOwnerPaid]     = useState(false)
   const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
   const [employeeId, setEmployeeId]     = useState('')
-  const [linkedCategories, setLinkedCats] = useState([])
+  const alsoInValues = ALSO_IN_CATS.map(c => c.value)
+  const [linkedCategories, setLinkedCats] = useState(
+    alsoInValues.includes(currentTab) ? [currentTab] : []
+  )
   const [date, setDate]                = useState(todayISO())
   const [error, setError]             = useState('')
   const [success, setSuccess]         = useState(false)
@@ -157,7 +160,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           <div className="bg-gray-50 border border-gray-200 rounded p-2.5">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Also show in →</p>
             <div className="flex flex-wrap gap-1.5">
-              {ALSO_IN_CATS.filter(c => c.value !== category).map(c => (
+              {ALSO_IN_CATS.map(c => (
                 <button key={c.value} type="button"
                   onClick={() => toggleLinkedCat(c.value)}
                   className="px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"

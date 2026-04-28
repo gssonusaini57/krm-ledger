@@ -145,8 +145,8 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
   const partnerStats = useMemo(() =>
     owners.map(owner => {
       const txns = transactions.filter(t => t.ownerId === owner.id || t.partnerId === owner.id)
-      const cashIn  = txns.filter(t => t.type === 'OWNER_DEPOSIT').reduce((s, t) => s + t.amount, 0)
-      const cashOut = txns.filter(t => t.type === 'OWNER_WITHDRAWAL').reduce((s, t) => s + t.amount, 0)
+      const cashIn  = txns.filter(t => t.type === 'OWNER_DEPOSIT' || t.type === 'CASH_IN').reduce((s, t) => s + t.amount, 0)
+      const cashOut = txns.filter(t => t.type === 'OWNER_WITHDRAWAL' || t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
       return { ...owner, cashIn, cashOut }
     }),
     [owners, transactions]

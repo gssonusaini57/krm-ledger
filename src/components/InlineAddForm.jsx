@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext'
-import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
+import { TRANSACTION_TYPES, todayISO } from '../utils/helpers'
 
 // Sidebar categories shown as "Also in" chips
 const ALSO_IN_CATS = [
@@ -17,7 +17,6 @@ const ALSO_IN_CATS = [
   { value: 'BROKEN_SELL',  label: 'Broken Sell'  },
 ]
 
-// Generate 2-3 char shortcut from employee name (e.g. "Ramesh Kumar" → "rk")
 function getShortcut(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length >= 2) return parts.map(p => p[0]).join('').toLowerCase()
@@ -29,22 +28,21 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
   const isOwnerMode = defaultMode === 'OWNER'
 
-  const [amount, setAmount]           = useState('')
-  const [description, setDesc]        = useState('')
-  const [category, setCategory]       = useState(defaultCategory || '')
-  const [payMode, setPayMode]         = useState('CASH')
-  const [ownerId, setOwnerId]         = useState(owners[0]?.id || '')
-  const [ownerPaid, setOwnerPaid]     = useState(false)
-  const [ownerPaidId, setOwnerPaidId] = useState(owners[0]?.id || '')
-  const [employeeId, setEmployeeId]     = useState('')
+  const [amount, setAmount]         = useState('')
+  const [description, setDesc]      = useState('')
+  const [category, setCategory]     = useState(defaultCategory || '')
+  const [payMode, setPayMode]       = useState('CASH')
+  const [ownerId, setOwnerId]       = useState(owners[0]?.id || '')
+  const [linkedPartnerId, setLinkedPartnerId] = useState('')
+  const [employeeId, setEmployeeId] = useState('')
   const alsoInValues = ALSO_IN_CATS.map(c => c.value)
   const [linkedCategories, setLinkedCats] = useState(
     alsoInValues.includes(currentTab) ? [currentTab] : []
   )
-  const [date, setDate]                = useState(todayISO())
-  const [error, setError]             = useState('')
-  const [success, setSuccess]         = useState(false)
-  const [lastAction, setLastAction]   = useState('')
+  const [date, setDate]             = useState(todayISO())
+  const [error, setError]           = useState('')
+  const [success, setSuccess]       = useState(false)
+  const [lastAction, setLastAction] = useState('')
 
   const fixedEmps    = employees.filter(e => e.type === 'FIXED')
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
@@ -53,14 +51,16 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const defaultLinked = alsoInValues.includes(currentTab) ? [currentTab] : []
 
   const reset = () => {
-    setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setOwnerPaid(false); setError('')
+    setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setLinkedPartnerId(''); setError('')
     setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCats(defaultLinked)
   }
 
   const toggleLinkedCat = (val) =>
     setLinkedCats(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])
 
-  // Fill form from employee object — amount stays manual
+  const togglePartner = (id) =>
+    setLinkedPartnerId(prev => prev === id ? '' : id)
+
   const fillEmployee = (emp) => {
     const isSalary = emp.type === 'FIXED'
     setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
@@ -68,7 +68,6 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setCategory(isSalary ? 'SALARY' : 'LABOUR')
   }
 
-  // Description change — check if typed text matches a shortcut
   const handleDescChange = (val) => {
     setDesc(val)
     const typed = val.trim().toLowerCase()
@@ -87,7 +86,14 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashIn = () => {
     setError('')
     const amt = validate(); if (!amt) return
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: payMode, ownerId: null, partnerId: ownerPaid && ownerPaidId ? ownerPaidId : null, linkedCategories: linkedCategories.length ? linkedCategories : null })
+    addTransaction({
+      date, amount: amt, description, category,
+      type: TRANSACTION_TYPES.CASH_IN,
+      paymentMode: payMode,
+      ownerId: null,
+      partnerId: linkedPartnerId || null,
+      linkedCategories: linkedCategories.length ? linkedCategories : null,
+    })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
@@ -95,13 +101,23 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashOut = () => {
     setError('')
     const amt = validate(); if (!amt) return
-    if (ownerPaid && !ownerPaidId) { setError('Select which partner paid'); return }
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.EXPENSE, paymentMode: payMode, ownerId: null, partnerId: null, employeeId: employeeId || null, linkedCategories: linkedCategories.length ? linkedCategories : null })
-    if (ownerPaid && ownerPaidId) {
+    addTransaction({
+      date, amount: amt, description, category,
+      type: TRANSACTION_TYPES.EXPENSE,
+      paymentMode: payMode,
+      ownerId: null,
+      partnerId: linkedPartnerId || null,
+      employeeId: employeeId || null,
+      linkedCategories: linkedCategories.length ? linkedCategories : null,
+    })
+    // If a partner is linked to a Cash Out, also credit their account
+    if (linkedPartnerId) {
+      const partner = owners.find(o => o.id === linkedPartnerId)
       addTransaction({
         date, amount: amt,
-        description: `${owners.find(o => o.id === ownerPaidId)?.name} paid: ${description}`,
-        category: '', type: TRANSACTION_TYPES.OWNER_DEPOSIT, paymentMode: '', ownerId: ownerPaidId,
+        description: `${partner?.name} paid: ${description}`,
+        category: '', type: TRANSACTION_TYPES.OWNER_DEPOSIT,
+        paymentMode: '', ownerId: linkedPartnerId,
       })
     }
     setLastAction('OUT'); setSuccess(true); reset()
@@ -120,11 +136,8 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     setTimeout(() => setSuccess(false), 1200)
   }
 
-  // Placeholder shows available employee shortcuts
   const shortcutHints = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
-  const descPlaceholder = shortcutHints
-    ? `Shortcut: ${shortcutHints}`
-    : 'Details (bk, st, lb, tr)...'
+  const descPlaceholder = shortcutHints ? `Shortcut: ${shortcutHints}` : 'Description...'
 
   return (
     <div className="mx-4 my-3 overflow-hidden shadow border border-gray-200 bg-white rounded-lg">
@@ -142,8 +155,6 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
             className="flex-1 bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-xl font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
           />
         </div>
-
-        {/* Category — hidden for now */}
 
         {/* Also in → always visible multi-select */}
         {!isOwnerMode && (
@@ -172,7 +183,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
         />
 
-        {/* Employee quick-pick for Salary / Labour — shows shortcut badge */}
+        {/* Employee quick-pick */}
         {!isOwnerMode && (category === 'SALARY' || category === 'LABOUR') && (() => {
           const isSalary = category === 'SALARY'
           const pool = isSalary ? fixedEmps : variableEmps
@@ -183,14 +194,12 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
                 const sc = getShortcut(emp.name)
                 const active = employeeId === emp.id
                 return (
-                  <button key={emp.id} type="button"
-                    onClick={() => fillEmployee(emp)}
+                  <button key={emp.id} type="button" onClick={() => fillEmployee(emp)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
                     style={active
                       ? { borderColor: isSalary ? '#7C3AED' : '#EA580C', background: isSalary ? '#8B5CF6' : '#F97316', color: '#fff' }
                       : { borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }
-                    }
-                  >
+                    }>
                     <span className="w-5 h-5 rounded flex items-center justify-center text-white font-bold text-xs"
                       style={{ background: isSalary ? '#8B5CF6' : '#F97316' }}>
                       {emp.name.charAt(0).toUpperCase()}
@@ -198,9 +207,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
                     {emp.name.split(' ')[0]}
                     {isSalary && emp.salary ? <span className="opacity-60">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
                     <span className="ml-0.5 px-1 py-0.5 rounded font-mono text-white"
-                      style={{ background: 'rgba(0,0,0,0.2)', fontSize: 9 }}>
-                      {sc}
-                    </span>
+                      style={{ background: 'rgba(0,0,0,0.2)', fontSize: 9 }}>{sc}</span>
                   </button>
                 )
               })}
@@ -208,7 +215,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           )
         })()}
 
-        {/* Pay mode + partner-paid */}
+        {/* Pay mode + Partner (always visible, single tap to link) */}
         {!isOwnerMode && (
           <div className="flex flex-wrap gap-2 items-center">
             {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
@@ -221,24 +228,26 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
                 {opt.icon} {opt.label}
               </button>
             ))}
-            <label className="flex items-center gap-2 cursor-pointer ml-1">
-              <input type="checkbox" checked={ownerPaid} onChange={e => setOwnerPaid(e.target.checked)} className="accent-amber-500 w-4 h-4" />
-              <span className="text-xs font-semibold text-gray-500">Partner?</span>
-            </label>
-            {ownerPaid && owners.map(o => (
-              <button key={o.id} type="button" onClick={() => setOwnerPaidId(o.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
-                style={ownerPaidId === o.id
-                  ? { borderColor: o.color || '#F59E0B', background: `${o.color || '#F59E0B'}18`, color: o.color || '#F59E0B' }
-                  : { borderColor: '#E2E8F0', color: '#94A3B8' }
-                }>
-                <span className="w-4 h-4 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                  style={{ background: o.color || '#F59E0B', fontSize: 9 }}>
-                  {o.name.charAt(0)}
-                </span>
-                {o.name.split(' ')[0]}
-              </button>
-            ))}
+
+            <div className="w-px h-5 bg-gray-200 mx-1" />
+
+            {owners.map(o => {
+              const active = linkedPartnerId === o.id
+              return (
+                <button key={o.id} type="button" onClick={() => togglePartner(o.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
+                  style={active
+                    ? { borderColor: o.color || '#F59E0B', background: o.color || '#F59E0B', color: '#fff' }
+                    : { borderColor: (o.color || '#F59E0B') + '60', background: (o.color || '#F59E0B') + '12', color: o.color || '#F59E0B' }
+                  }>
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                    style={{ background: active ? 'rgba(255,255,255,0.3)' : o.color || '#F59E0B', color: '#fff', fontSize: 9 }}>
+                    {o.name.charAt(0)}
+                  </span>
+                  {o.name.split(' ')[0]}
+                </button>
+              )
+            })}
           </div>
         )}
 
@@ -271,16 +280,12 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           <div className="flex gap-2">
             <button type="button" onClick={handleCashIn}
               className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-widest transition-all active:scale-95"
-              style={success && lastAction === 'IN'
-                ? { background: '#34D399' }
-                : { background: '#16A34A' }}>
+              style={success && lastAction === 'IN' ? { background: '#34D399' } : { background: '#16A34A' }}>
               {success && lastAction === 'IN' ? '✓ Saved!' : 'Cash In'}
             </button>
             <button type="button" onClick={handleCashOut}
               className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-widest transition-all active:scale-95"
-              style={success && lastAction === 'OUT'
-                ? { background: '#FB7185' }
-                : { background: '#DC2626' }}>
+              style={success && lastAction === 'OUT' ? { background: '#FB7185' } : { background: '#DC2626' }}>
               {success && lastAction === 'OUT' ? '✓ Saved!' : 'Cash Out'}
             </button>
           </div>

@@ -147,7 +147,6 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
         {!isOwnerMode && (
           <select value={category} onChange={e => { setCategory(e.target.value); setLinkedCats(defaultLinked) }}
             className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all">
-            <option value="">-- Direct Entry --</option>
             <optgroup label="Cash In Categories">
               {INCOME_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </optgroup>

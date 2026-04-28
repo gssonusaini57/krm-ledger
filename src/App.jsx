@@ -400,12 +400,14 @@ function MainApp() {
         if (!isP && !isL) return false
       }
       else if (CATEGORY_TABS.has(tab)) {
-        if (t.type !== TRANSACTION_TYPES.EXPENSE) return false
-        if (t.category !== tab && !hasLinked(t, tab)) return false
+        const byCategory = t.type === TRANSACTION_TYPES.EXPENSE && t.category === tab
+        const byLink = hasLinked(t, tab)
+        if (!byCategory && !byLink) return false
       }
       else if (INCOME_CATEGORY_TABS.has(tab)) {
-        if (t.type !== TRANSACTION_TYPES.CASH_IN) return false
-        if (t.category !== tab && !hasLinked(t, tab)) return false
+        const byCategory = t.type === TRANSACTION_TYPES.CASH_IN && t.category === tab
+        const byLink = hasLinked(t, tab)
+        if (!byCategory && !byLink) return false
       }
       if (search.trim()) {
         const q = search.toLowerCase()

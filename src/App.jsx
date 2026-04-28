@@ -358,8 +358,8 @@ function MainApp() {
 
   const cashInHand = useMemo(() =>
     transactions.reduce((sum, t) => {
-      if (t.type === TRANSACTION_TYPES.CASH_IN  && isCashTxn(t)) return sum + t.amount
-      if (t.type === TRANSACTION_TYPES.EXPENSE  && isCashTxn(t)) return sum - t.amount
+      if ((t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT) && isCashTxn(t)) return sum + t.amount
+      if ((t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) && isCashTxn(t)) return sum - t.amount
       return sum
     }, 0),
     [transactions]
@@ -376,8 +376,8 @@ function MainApp() {
     const today = new Date().toISOString().slice(0, 10)
     const t2 = transactions.filter(t => t.date === today)
     return {
-      todayIn:  t2.filter(t => t.type === TRANSACTION_TYPES.CASH_IN  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
-      todayOut: t2.filter(t => t.type === TRANSACTION_TYPES.EXPENSE  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      todayIn:  t2.filter(t => (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      todayOut: t2.filter(t => (t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
     }
   }, [transactions])
 
@@ -385,8 +385,8 @@ function MainApp() {
     if (!monthFilter) return { monthIn: 0, monthOut: 0 }
     const m = transactions.filter(t => t.date.startsWith(monthFilter))
     return {
-      monthIn:  m.filter(t => t.type === TRANSACTION_TYPES.CASH_IN  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
-      monthOut: m.filter(t => t.type === TRANSACTION_TYPES.EXPENSE  && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      monthIn:  m.filter(t => (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      monthOut: m.filter(t => (t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
     }
   }, [transactions, monthFilter])
 

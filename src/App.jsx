@@ -401,7 +401,7 @@ function MainApp() {
       else if (tab === 'OUT')   { if (t.type !== TRANSACTION_TYPES.EXPENSE) return false }
       else if (tab === 'OWNER') {
         const isP = t.type === TRANSACTION_TYPES.OWNER_DEPOSIT || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL
-        const isL = t.partnerId && (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.EXPENSE)
+        const isL = (t.partnerId || t.ownerId) && (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.EXPENSE)
         if (!isP && !isL) return false
       }
       else if (CATEGORY_TABS.has(tab)) {

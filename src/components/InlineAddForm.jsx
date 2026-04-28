@@ -87,7 +87,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashIn = () => {
     setError('')
     const amt = validate(); if (!amt) return
-    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: payMode, ownerId: null, partnerId: null, linkedCategories: linkedCategories.length ? linkedCategories : null })
+    addTransaction({ date, amount: amt, description, category, type: TRANSACTION_TYPES.CASH_IN, paymentMode: payMode, ownerId: null, partnerId: ownerPaid && ownerPaidId ? ownerPaidId : null, linkedCategories: linkedCategories.length ? linkedCategories : null })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
@@ -223,7 +223,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
             ))}
             <label className="flex items-center gap-2 cursor-pointer ml-1">
               <input type="checkbox" checked={ownerPaid} onChange={e => setOwnerPaid(e.target.checked)} className="accent-amber-500 w-4 h-4" />
-              <span className="text-xs font-semibold text-gray-500">Partner paid?</span>
+              <span className="text-xs font-semibold text-gray-500">Partner?</span>
             </label>
             {ownerPaid && owners.map(o => (
               <button key={o.id} type="button" onClick={() => setOwnerPaidId(o.id)}

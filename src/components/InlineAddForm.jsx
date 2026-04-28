@@ -2,13 +2,12 @@ import { useState } from 'react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, todayISO } from '../utils/helpers'
 
-// Sidebar categories shown as "Also in" chips
-const ALSO_IN_CATS = [
+const CATEGORY_CHIPS = [
   { value: 'SALARY',       label: 'Salary'       },
   { value: 'LABOUR',       label: 'Labour'       },
   { value: 'BANK',         label: 'Bank'         },
   { value: 'DEPOT_EXP',    label: 'Depot'        },
-  { value: 'EXPENDITURE',  label: 'Expenditure'  },
+  { value: 'EXPENDITURE',  label: 'Expense'      },
   { value: 'ASHOK_DEPOT',  label: 'Ashok Depot'  },
   { value: 'TRUCK',        label: 'Truck'        },
   { value: 'PANKAJ_PLASH', label: 'Pankaj Plash' },
@@ -16,6 +15,8 @@ const ALSO_IN_CATS = [
   { value: 'BROKEN_BUY',   label: 'Broken Buy'   },
   { value: 'BROKEN_SELL',  label: 'Broken Sell'  },
 ]
+
+const CAT_VALUES = new Set(CATEGORY_CHIPS.map(c => c.value))
 
 function getShortcut(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -30,15 +31,20 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
 
   const [amount, setAmount]         = useState('')
   const [description, setDesc]      = useState('')
-  const [category, setCategory]     = useState(defaultCategory || '')
   const [payMode, setPayMode]       = useState('CASH')
   const [ownerId, setOwnerId]       = useState(owners[0]?.id || '')
   const [linkedPartnerId, setLinkedPartnerId] = useState('')
   const [employeeId, setEmployeeId] = useState('')
-  const alsoInValues = ALSO_IN_CATS.map(c => c.value)
-  const [linkedCategories, setLinkedCats] = useState(
-    alsoInValues.includes(currentTab) ? [currentTab] : []
-  )
+
+  // Unified destination chips (categories + will show partner inline too)
+  const initSelected = () => {
+    const s = new Set()
+    if (defaultCategory && CAT_VALUES.has(defaultCategory)) s.add(defaultCategory)
+    else if (CAT_VALUES.has(currentTab)) s.add(currentTab)
+    return s
+  }
+  const [selected, setSelected] = useState(initSelected)
+
   const [date, setDate]             = useState(todayISO())
   const [error, setError]           = useState('')
   const [success, setSuccess]       = useState(false)
@@ -48,15 +54,26 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
   const allEmps      = [...fixedEmps, ...variableEmps]
 
-  const defaultLinked = alsoInValues.includes(currentTab) ? [currentTab] : []
-
-  const reset = () => {
-    setAmount(''); setDesc(''); setCategory(defaultCategory || ''); setLinkedPartnerId(''); setError('')
-    setPayMode('CASH'); setDate(todayISO()); setEmployeeId(''); setLinkedCats(defaultLinked)
+  const initSelected2 = () => {
+    const s = new Set()
+    if (defaultCategory && CAT_VALUES.has(defaultCategory)) s.add(defaultCategory)
+    else if (CAT_VALUES.has(currentTab)) s.add(currentTab)
+    return s
   }
 
-  const toggleLinkedCat = (val) =>
-    setLinkedCats(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])
+  const reset = () => {
+    setAmount(''); setDesc(''); setLinkedPartnerId(''); setError('')
+    setPayMode('CASH'); setDate(todayISO()); setEmployeeId('')
+    setSelected(initSelected2())
+  }
+
+  const toggleCat = (val) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(val) ? next.delete(val) : next.add(val)
+      return next
+    })
+  }
 
   const togglePartner = (id) =>
     setLinkedPartnerId(prev => prev === id ? '' : id)
@@ -65,7 +82,11 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     const isSalary = emp.type === 'FIXED'
     setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
     setEmployeeId(emp.id)
-    setCategory(isSalary ? 'SALARY' : 'LABOUR')
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.add(isSalary ? 'SALARY' : 'LABOUR')
+      return next
+    })
   }
 
   const handleDescChange = (val) => {
@@ -83,16 +104,25 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     return amt
   }
 
+  // Build transaction fields from selected chips
+  const buildFields = () => {
+    const cats = [...selected]
+    const primary = cats[0] || ''
+    const linked  = cats.length > 1 ? cats : cats.length === 1 ? cats : null
+    return { category: primary, linkedCategories: linked }
+  }
+
   const handleCashIn = () => {
     setError('')
     const amt = validate(); if (!amt) return
+    const { category, linkedCategories } = buildFields()
     addTransaction({
       date, amount: amt, description, category,
       type: TRANSACTION_TYPES.CASH_IN,
       paymentMode: payMode,
       ownerId: null,
       partnerId: linkedPartnerId || null,
-      linkedCategories: linkedCategories.length ? linkedCategories : null,
+      linkedCategories,
     })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
@@ -101,6 +131,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const handleCashOut = () => {
     setError('')
     const amt = validate(); if (!amt) return
+    const { category, linkedCategories } = buildFields()
     addTransaction({
       date, amount: amt, description, category,
       type: TRANSACTION_TYPES.EXPENSE,
@@ -108,9 +139,8 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
       ownerId: null,
       partnerId: linkedPartnerId || null,
       employeeId: employeeId || null,
-      linkedCategories: linkedCategories.length ? linkedCategories : null,
+      linkedCategories,
     })
-    // If a partner is linked to a Cash Out, also credit their account
     if (linkedPartnerId) {
       const partner = owners.find(o => o.id === linkedPartnerId)
       addTransaction({
@@ -139,6 +169,8 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   const shortcutHints = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
   const descPlaceholder = shortcutHints ? `Shortcut: ${shortcutHints}` : 'Description...'
 
+  const hasSalaryLabour = selected.has('SALARY') || selected.has('LABOUR')
+
   return (
     <div className="mx-4 my-3 overflow-hidden shadow border border-gray-200 bg-white rounded-lg">
       <div className="px-4 pb-4 pt-4 space-y-2.5">
@@ -156,26 +188,6 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           />
         </div>
 
-        {/* Also in → always visible multi-select */}
-        {!isOwnerMode && (
-          <div className="bg-gray-50 border border-gray-200 rounded p-2.5">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Also show in →</p>
-            <div className="flex flex-wrap gap-1.5">
-              {ALSO_IN_CATS.map(c => (
-                <button key={c.value} type="button"
-                  onClick={() => toggleLinkedCat(c.value)}
-                  className="px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"
-                  style={linkedCategories.includes(c.value)
-                    ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
-                    : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }
-                  }>
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Description */}
         <input
           type="text" placeholder={descPlaceholder}
@@ -183,9 +195,59 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
         />
 
-        {/* Employee quick-pick */}
-        {!isOwnerMode && (category === 'SALARY' || category === 'LABOUR') && (() => {
-          const isSalary = category === 'SALARY'
+        {/* ── UNIFIED DESTINATION ─────────────────────────────────────────── */}
+        {!isOwnerMode && (
+          <div className="bg-gray-50 border border-gray-200 rounded p-2.5 space-y-2">
+
+            {/* Category chips */}
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Category</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORY_CHIPS.map(c => {
+                  const active = selected.has(c.value)
+                  return (
+                    <button key={c.value} type="button" onClick={() => toggleCat(c.value)}
+                      className="px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"
+                      style={active
+                        ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
+                        : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }
+                      }>
+                      {c.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Partner chips */}
+            <div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Partner</p>
+              <div className="flex flex-wrap gap-1.5">
+                {owners.map(o => {
+                  const active = linkedPartnerId === o.id
+                  return (
+                    <button key={o.id} type="button" onClick={() => togglePartner(o.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"
+                      style={active
+                        ? { borderColor: o.color || '#F59E0B', background: o.color || '#F59E0B', color: '#fff' }
+                        : { borderColor: (o.color || '#F59E0B') + '50', background: (o.color || '#F59E0B') + '10', color: o.color || '#F59E0B' }
+                      }>
+                      <span className="w-4 h-4 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                        style={{ background: active ? 'rgba(255,255,255,0.35)' : o.color || '#F59E0B', fontSize: 9 }}>
+                        {o.name.charAt(0)}
+                      </span>
+                      {o.name.split(' ')[0]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Employee quick-pick (when Salary or Labour selected) */}
+        {!isOwnerMode && hasSalaryLabour && (() => {
+          const isSalary = selected.has('SALARY')
           const pool = isSalary ? fixedEmps : variableEmps
           if (!pool.length) return null
           return (
@@ -215,9 +277,9 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
           )
         })()}
 
-        {/* Pay mode + Partner (always visible, single tap to link) */}
+        {/* Pay mode */}
         {!isOwnerMode && (
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex gap-2">
             {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
               <button key={opt.key} type="button" onClick={() => setPayMode(opt.key)}
                 className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
@@ -228,26 +290,6 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
                 {opt.icon} {opt.label}
               </button>
             ))}
-
-            <div className="w-px h-5 bg-gray-200 mx-1" />
-
-            {owners.map(o => {
-              const active = linkedPartnerId === o.id
-              return (
-                <button key={o.id} type="button" onClick={() => togglePartner(o.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
-                  style={active
-                    ? { borderColor: o.color || '#F59E0B', background: o.color || '#F59E0B', color: '#fff' }
-                    : { borderColor: (o.color || '#F59E0B') + '60', background: (o.color || '#F59E0B') + '12', color: o.color || '#F59E0B' }
-                  }>
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center font-bold flex-shrink-0"
-                    style={{ background: active ? 'rgba(255,255,255,0.3)' : o.color || '#F59E0B', color: '#fff', fontSize: 9 }}>
-                    {o.name.charAt(0)}
-                  </span>
-                  {o.name.split(' ')[0]}
-                </button>
-              )
-            })}
           </div>
         )}
 

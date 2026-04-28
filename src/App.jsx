@@ -344,6 +344,9 @@ function MainApp() {
   const [editData, setEditData]     = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [confirmBulkDel, setConfirmBulkDel] = useState(false)
   const [selectedPartner, setSelectedPartner]   = useState(null)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [fromDate, setFromDate]     = useState(todayISO())
@@ -636,6 +639,13 @@ function MainApp() {
                 style={{ background: '#3B82F6' }}>
                 <Printer size={13} /> Print
               </button>
+              <button onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()) }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold flex-shrink-0 transition-all"
+                style={selectMode
+                  ? { background: '#F43F5E', color: '#fff' }
+                  : { background: '#F1F5F9', color: '#64748B' }}>
+                {selectMode ? 'Cancel' : 'Select'}
+              </button>
             </div>
 
             {/* Row 2: Date range filter */}
@@ -739,7 +749,23 @@ function MainApp() {
                                  : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
                   const catColor = CAT_COLOR[t.category] || (inflow ? '#10B981' : '#F43F5E')
                   return (
-                    <div key={t.id} className="bg-white rounded-xl px-3 py-2.5 shadow-sm border border-gray-100 flex items-center gap-2.5">
+                    <div key={t.id}
+                      onClick={selectMode ? () => setSelectedIds(prev => {
+                        const next = new Set(prev)
+                        next.has(t.id) ? next.delete(t.id) : next.add(t.id)
+                        return next
+                      }) : undefined}
+                      className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5 transition-all"
+                      style={{ borderColor: selectMode && selectedIds.has(t.id) ? '#F43F5E' : '#F1F5F9', cursor: selectMode ? 'pointer' : 'default', background: selectMode && selectedIds.has(t.id) ? '#FFF1F2' : '#fff' }}>
+                      {selectMode ? (
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: selectedIds.has(t.id) ? '#F43F5E' : '#F1F5F9' }}>
+                          {selectedIds.has(t.id)
+                            ? <span className="text-white font-bold text-sm">✓</span>
+                            : <span className="text-gray-400 text-sm">○</span>
+                          }
+                        </div>
+                      ) : (
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: inflow ? '#ECFDF5' : '#FFF1F2' }}>
                         {inflow
@@ -747,6 +773,7 @@ function MainApp() {
                           : <ArrowDownRight size={16} color="#F43F5E" />
                         }
                       </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 truncate text-xs">{t.description}</p>
                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
@@ -774,6 +801,7 @@ function MainApp() {
                         <p className="font-bold text-sm" style={{ color: inflow ? '#10B981' : '#F43F5E' }}>
                           {inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
                         </p>
+                        {!selectMode && (
                         <div className="flex gap-1 mt-1 justify-end">
                           <button onClick={() => { setEditData(t); setShowEditForm(true) }}
                             className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
@@ -784,6 +812,7 @@ function MainApp() {
                             <Trash2 size={10} />
                           </button>
                         </div>
+                        )}
                       </div>
                     </div>
                   )
@@ -794,6 +823,46 @@ function MainApp() {
         </div></>)}
 
       </div>
+
+      {/* ── BULK SELECT BAR ──────────────────────────────────────────────── */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl"
+          style={{ background: '#1E293B' }}>
+          <span className="text-white text-sm font-semibold">{selectedIds.size} selected</span>
+          <button onClick={() => setConfirmBulkDel(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+            style={{ background: '#F43F5E' }}>
+            <Trash2 size={14} /> Delete
+          </button>
+        </div>
+      )}
+
+      {/* ── BULK DELETE CONFIRM ───────────────────────────────────────────── */}
+      {confirmBulkDel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+              <Trash2 size={22} color="#F43F5E" />
+            </div>
+            <p className="font-bold text-gray-900 text-lg mb-1">Delete {selectedIds.size} {selectedIds.size === 1 ? 'Entry' : 'Entries'}?</p>
+            <p className="text-gray-400 text-sm mb-5">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmBulkDel(false)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
+                Cancel
+              </button>
+              <button onClick={() => {
+                selectedIds.forEach(id => deleteTransaction(id))
+                setSelectedIds(new Set()); setSelectMode(false); setConfirmBulkDel(false)
+              }}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                style={{ background: '#F43F5E' }}>
+                Delete All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── DELETE CONFIRM ────────────────────────────────────────────────── */}
       {confirmDel && (

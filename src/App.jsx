@@ -392,7 +392,7 @@ function MainApp() {
       if (appliedFrom) {
         if (t.date < appliedFrom || t.date > appliedTo) return false
       } else if (monthFilter && !t.date.startsWith(monthFilter)) return false
-      if (tab === 'IN')    { if (t.type !== TRANSACTION_TYPES.CASH_IN) return false }
+      if (tab === 'IN')    { if (t.type !== TRANSACTION_TYPES.CASH_IN && t.type !== TRANSACTION_TYPES.OWNER_DEPOSIT) return false }
       else if (tab === 'OUT')   { if (t.type !== TRANSACTION_TYPES.EXPENSE) return false }
       else if (tab === 'OWNER') {
         const isP = t.type === TRANSACTION_TYPES.OWNER_DEPOSIT || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL

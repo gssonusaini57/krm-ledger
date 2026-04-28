@@ -64,7 +64,7 @@ const REPORT_W  = 200
 function Sidebar({ activeTab, onTabChange, companyName }) {
   return (
     <div
-      className="fixed left-0 top-0 h-full z-30 flex flex-col overflow-y-auto"
+      className="hidden md:flex flex-col fixed left-0 top-0 h-full z-30 overflow-y-auto"
       style={{ width: SIDEBAR_W, background: '#0F1923', borderRight: '1px solid rgba(255,255,255,0.07)' }}
     >
       {/* Brand */}
@@ -135,7 +135,7 @@ const hasLinked = (t, val) =>
 const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || hasLinked(t, 'BANK')
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
-function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
+function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer = false }) {
 
   const { bankIn, bankOut } = useMemo(() => ({
     bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
@@ -153,14 +153,15 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick }) {
   )
 
   return (
-    <div className="fixed right-0 top-0 h-full z-30 flex flex-col overflow-y-auto"
-      style={{ width: REPORT_W, background: '#0F1923', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className={isDrawer ? "flex flex-col overflow-y-auto flex-1" : "hidden md:flex flex-col fixed right-0 top-0 h-full z-30 overflow-y-auto"}
+      style={isDrawer ? { background: '#0F1923' } : { width: REPORT_W, background: '#0F1923', borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
 
-      {/* Header */}
+      {!isDrawer && (
       <div className="flex items-center justify-center"
         style={{ background: '#1B5C20', minHeight: 50, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <span className="text-white font-bold uppercase tracking-widest text-sm">Report</span>
       </div>
+      )}
 
       {/* Bank Balance */}
       <div className="px-3 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
@@ -344,6 +345,7 @@ function MainApp() {
   const [editData, setEditData]     = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
+  const [showMobileReport, setShowMobileReport] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [confirmBulkDel, setConfirmBulkDel] = useState(false)
@@ -529,20 +531,44 @@ function MainApp() {
       />
 
       {/* ── MAIN CONTENT (between both sidebars) ────────────────────────── */}
-      <div className="flex flex-col flex-1" style={{ marginLeft: SIDEBAR_W, marginRight: REPORT_W }}>
+      <div className="flex flex-col flex-1 md:ml-[200px] md:mr-[200px]">
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
-        <div className="sticky top-0 z-20 flex items-center justify-center px-12 py-3 text-center"
-          style={{ background: '#1B5C20', minHeight: 60 }}>
-          <span className="text-white font-bold uppercase tracking-widest text-sm leading-snug">
-            {settings.companyName || 'KRM Rice Mill'}
-          </span>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-            <button onClick={() => setShowSettings(true)}
-              className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.12)' }}>
-              <Settings size={14} color="rgba(255,255,255,0.85)" />
-            </button>
+        <div className="sticky top-0 z-20" style={{ background: '#1B5C20' }}>
+          <div className="flex items-center justify-center px-12 py-3 text-center" style={{ minHeight: 54 }}>
+            <span className="text-white font-bold uppercase tracking-widest text-sm leading-snug">
+              {settings.companyName || 'KRM Rice Mill'}
+            </span>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              <button onClick={() => setShowMobileReport(true)}
+                className="md:hidden w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.12)' }}>
+                <span className="text-white font-bold text-xs">R</span>
+              </button>
+              <button onClick={() => setShowSettings(true)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.12)' }}>
+                <Settings size={14} color="rgba(255,255,255,0.85)" />
+              </button>
+            </div>
+          </div>
+          {/* Mobile-only horizontal tab scroll */}
+          <div className="flex md:hidden overflow-x-auto gap-1.5 px-3 pb-2 scrollbar-none"
+            style={{ scrollbarWidth: 'none' }}>
+            {[...NAV_MAIN, ...NAV_EXPENSE].map(item => {
+              const active = tab === item.key
+              const color = CAT_COLOR[item.key] || '#818CF8'
+              return (
+                <button key={item.key} onClick={() => switchTab(item.key)}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                  style={active
+                    ? { background: '#fff', color: '#1B5C20' }
+                    : { background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)' }
+                  }>
+                  {item.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -714,7 +740,7 @@ function MainApp() {
         )}
 
         {/* ── TRANSACTION LIST ──────────────────────────────────────────── */}
-        <div className="flex-1 px-3 pb-6 space-y-3">
+        <div className="flex-1 px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
           {grouped.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3">
@@ -823,6 +849,27 @@ function MainApp() {
         </div></>)}
 
       </div>
+
+      {/* ── MOBILE REPORT DRAWER ────────────────────────────────────────── */}
+      {showMobileReport && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowMobileReport(false)} />
+          <div className="absolute right-0 top-0 h-full w-72 flex flex-col overflow-hidden"
+            style={{ background: '#0F1923' }}>
+            <div className="flex items-center justify-between px-4 flex-shrink-0"
+              style={{ background: '#1B5C20', minHeight: 54 }}>
+              <span className="text-white font-bold text-sm uppercase tracking-widest">Report</span>
+              <button onClick={() => setShowMobileReport(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.15)' }}>
+                <XIcon size={16} color="#fff" />
+              </button>
+            </div>
+            <ReportPanel isDrawer owners={owners} transactions={transactions} settings={settings}
+              onPartnerClick={(p) => { setSelectedPartner(p); setShowMobileReport(false) }} />
+          </div>
+        </div>
+      )}
 
       {/* ── BULK SELECT BAR ──────────────────────────────────────────────── */}
       {selectMode && selectedIds.size > 0 && (

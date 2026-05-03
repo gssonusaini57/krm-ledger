@@ -124,16 +124,16 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
   const shortcutHints   = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
 
   return (
-    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg"
+    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg flex flex-col h-full"
       style={{ borderTop: '4px solid #16A34A' }}>
 
       {/* Header */}
-      <div className="px-3 py-2 border-b border-gray-100" style={{ background: '#F0FDF4' }}>
+      <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0" style={{ background: '#F0FDF4' }}>
         <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>💵 Simple Form</p>
         <p className="text-xs text-gray-400">Cash in Hand</p>
       </div>
 
-      <div className="px-3 pt-3 pb-3 space-y-2">
+      <div className="px-3 pt-3 pb-3 space-y-2 flex flex-col flex-1">
 
         {/* Date + Amount */}
         <div className="flex gap-1.5">
@@ -205,8 +205,8 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
 
         {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
 
-        {/* Credit / Debit */}
-        <div className="flex gap-1.5 pt-1">
+        {/* Credit / Debit — pinned to bottom */}
+        <div className="flex gap-1.5 pt-1 mt-auto">
           <button type="button" onClick={handleCredit}
             className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
             style={{ background: success && lastAction === 'IN' ? '#34D399' : '#16A34A' }}>

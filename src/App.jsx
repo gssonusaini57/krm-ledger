@@ -601,28 +601,33 @@ function MainApp() {
           </div>
         </div>
 
-        {/* ── ENTRY FORMS (side-by-side) ────────────────────────────────── */}
+        {/* ── CASH IN HAND BANNER ───────────────────────────────────────── */}
         {tab !== 'STAFF' && (
-          <div className="mx-3 mt-3 mb-3 grid grid-cols-2 gap-2 items-start">
-
-            {/* Left — Cash in Hand + Simple Form */}
-            <div className="space-y-2">
-              <div className="rounded-lg px-3 py-2.5" style={{ background: '#1B5C20' }}>
-                <p className="text-white/60 uppercase tracking-widest font-bold" style={{ fontSize: 10 }}>
-                  {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash in Hand'}
-                </p>
-                <p className="font-bold text-yellow-400" style={{ fontSize: 22, lineHeight: 1.15 }}>
-                  {formatCurrency(cashInHand, settings.currency)}
-                </p>
-              </div>
-              <InlineAddForm
-                key={tab}
-                defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
-                currentTab={tab}
-              />
+          <div className="mx-3 mt-3 rounded-lg px-3 py-2.5 flex items-center justify-between"
+            style={{ background: '#1B5C20' }}>
+            <div>
+              <p className="text-white/60 uppercase tracking-widest font-bold" style={{ fontSize: 10 }}>
+                {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash in Hand'}
+              </p>
+              <p className="font-bold text-yellow-400" style={{ fontSize: 22, lineHeight: 1.15 }}>
+                {formatCurrency(cashInHand, settings.currency)}
+              </p>
             </div>
+            <div className="text-right text-white/50 text-xs">
+              <div>Today ↑ <span className="text-emerald-400 font-bold">{formatCurrency(todayIn, settings.currency)}</span></div>
+              <div>Today ↓ <span className="text-rose-400 font-bold">{formatCurrency(todayOut, settings.currency)}</span></div>
+            </div>
+          </div>
+        )}
 
-            {/* Right — Partner Form */}
+        {/* ── ENTRY FORMS (side-by-side, same height) ──────────────────── */}
+        {tab !== 'STAFF' && (
+          <div className="mx-3 mt-2 mb-3 grid grid-cols-2 gap-2 items-stretch">
+            <InlineAddForm
+              key={tab}
+              defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
+              currentTab={tab}
+            />
             <AdvancePaymentForm key={`adv-${tab}`} />
           </div>
         )}
@@ -686,8 +691,8 @@ function MainApp() {
                 className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold flex-shrink-0 transition-all"
                 style={selectMode
                   ? { background: '#F43F5E', color: '#fff' }
-                  : { background: '#F1F5F9', color: '#64748B' }}>
-                {selectMode ? 'Cancel' : 'Select'}
+                  : { background: '#FEE2E2', color: '#DC2626' }}>
+                {selectMode ? '✕ Cancel' : <><Trash2 size={12} />&nbsp;Select</>}
               </button>
             </div>
 

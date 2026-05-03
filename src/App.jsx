@@ -145,10 +145,14 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
 
   const partnerStats = useMemo(() =>
     owners.map(owner => {
-      const txns = transactions.filter(t => t.ownerId === owner.id || t.partnerId === owner.id)
-      const cashIn  = txns.filter(t => t.type === 'OWNER_DEPOSIT' || t.type === 'CASH_IN').reduce((s, t) => s + t.amount, 0)
-      const cashOut = txns.filter(t => t.type === 'OWNER_WITHDRAWAL' || t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
-      return { ...owner, cashIn, cashOut }
+      const txns     = transactions.filter(t => t.ownerId === owner.id || t.partnerId === owner.id)
+      const isOnline = t => t.paymentMode === 'ONLINE'
+      const isCash   = t => !t.paymentMode || t.paymentMode === 'CASH'
+      const outTypes = t => t.type === 'OWNER_WITHDRAWAL' || t.type === 'EXPENSE'
+      const cashIn   = txns.filter(t => t.type === 'OWNER_DEPOSIT' || t.type === 'CASH_IN').reduce((s, t) => s + t.amount, 0)
+      const paidCash = txns.filter(t => outTypes(t) && isCash(t)).reduce((s, t) => s + t.amount, 0)
+      const paidBank = txns.filter(t => outTypes(t) && isOnline(t)).reduce((s, t) => s + t.amount, 0)
+      return { ...owner, cashIn, paidCash, paidBank, cashOut: paidCash + paidBank }
     }),
     [owners, transactions]
   )
@@ -192,17 +196,19 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
         </div>
       </div>
 
-      {/* Partner Cash — each partner's own Credit / Debit */}
+      {/* Partner Balance — Received / Cash Paid / Bank Paid / Pending */}
       <div className="px-3 py-3 space-y-2">
-        <p className="text-white/40 text-xs uppercase tracking-wide px-1">Partner Cash</p>
+        <p className="text-white/40 text-xs uppercase tracking-wide px-1">Partner Balance</p>
         {partnerStats.map((owner, i) => {
-          const color = owner.color || OWNER_COLORS[i]
+          const color   = owner.color || OWNER_COLORS[i]
+          const pending = owner.cashIn - owner.cashOut
           return (
             <div key={owner.id} onClick={() => onPartnerClick(owner)}
               className="cursor-pointer rounded-lg p-2.5 transition-all"
               style={{ background: 'rgba(255,255,255,0.05)' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.09)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}>
+
               {/* Name row */}
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
@@ -211,20 +217,36 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
                 </div>
                 <p className="text-white/80 text-xs font-semibold">{owner.name.split(' ')[0]}</p>
               </div>
-              {/* Credit / Debit rows */}
+
               <div className="space-y-1 pl-1">
+                {/* Received */}
                 <div className="flex justify-between items-center">
-                  <span className="text-white/40 text-xs">Credit</span>
-                  <span className="font-bold text-xs text-emerald-400">{formatCurrency(owner.cashIn, settings.currency)}</span>
+                  <span className="text-white/40 text-xs">Received</span>
+                  <span className="font-bold text-xs text-emerald-400">+{formatCurrency(owner.cashIn, settings.currency)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-white/40 text-xs">Debit</span>
-                  <span className="font-bold text-xs text-rose-400">{formatCurrency(owner.cashOut, settings.currency)}</span>
-                </div>
+
+                {/* Cash Paid — only when non-zero */}
+                {owner.paidCash > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/40 text-xs">💵 Cash Paid</span>
+                    <span className="font-bold text-xs text-rose-400">−{formatCurrency(owner.paidCash, settings.currency)}</span>
+                  </div>
+                )}
+
+                {/* Bank Paid — only when non-zero */}
+                {owner.paidBank > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-white/40 text-xs">🏦 Bank Paid</span>
+                    <span className="font-bold text-xs text-rose-400">−{formatCurrency(owner.paidBank, settings.currency)}</span>
+                  </div>
+                )}
+
+                {/* Pending */}
                 <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <span className="text-white/40 text-xs">Net</span>
-                  <span className="font-bold text-xs" style={{ color: (owner.cashIn - owner.cashOut) >= 0 ? '#FBBF24' : '#FB7185' }}>
-                    {formatCurrency(owner.cashIn - owner.cashOut, settings.currency)}
+                  <span className="text-white/60 text-xs font-bold">Pending</span>
+                  <span className="font-bold text-xs" style={{ color: pending >= 0 ? '#FBBF24' : '#FB7185' }}>
+                    {formatCurrency(Math.abs(pending), settings.currency)}
+                    {pending < 0 && <span className="ml-1 opacity-60">(cr)</span>}
                   </span>
                 </div>
               </div>

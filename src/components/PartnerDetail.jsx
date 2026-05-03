@@ -14,10 +14,17 @@ function dayLabel(dateStr) {
 export default function PartnerDetail({ partner, onClose }) {
   const { transactions, settings } = useApp()
 
-  // All transactions belonging to this partner
+  // All transactions belonging to this partner.
+  // EXPENSE entries linked via partnerId are excluded — those are mill expenses
+  // and should not appear as Debits in the partner's ledger. Only OWNER_DEPOSIT,
+  // OWNER_WITHDRAWAL, and CASH_IN linked entries belong here.
   const partnerTxns = useMemo(() =>
     transactions
-      .filter(t => t.ownerId === partner.id || t.partnerId === partner.id)
+      .filter(t => {
+        if (t.ownerId === partner.id) return true
+        if (t.partnerId === partner.id && t.type !== TRANSACTION_TYPES.EXPENSE) return true
+        return false
+      })
       .sort((a, b) => b.date.localeCompare(a.date) || new Date(b.createdAt) - new Date(a.createdAt)),
     [transactions, partner.id]
   )

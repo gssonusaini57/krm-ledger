@@ -3,17 +3,17 @@ import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, todayISO } from '../utils/helpers'
 
 const CATEGORY_CHIPS = [
-  { value: 'SALARY',       label: 'Salary'       },
-  { value: 'LABOUR',       label: 'Labour'       },
-  { value: 'BANK',         label: 'Bank'         },
-  { value: 'DEPOT_EXP',    label: 'Depot'        },
-  { value: 'EXPENDITURE',  label: 'Expense'      },
-  { value: 'ASHOK_DEPOT',  label: 'Ashok Depot'  },
-  { value: 'TRUCK',        label: 'Truck'        },
-  { value: 'PANKAJ_PLASH', label: 'Pankaj Plash' },
-  { value: 'AMAN_PLASH',   label: 'Aman Plash'   },
-  { value: 'BROKEN_BUY',   label: 'Broken Buy'   },
-  { value: 'BROKEN_SELL',  label: 'Broken Sell'  },
+  { value: 'SALARY',       label: 'Salary'     },
+  { value: 'LABOUR',       label: 'Labour'     },
+  { value: 'BANK',         label: 'Bank'       },
+  { value: 'DEPOT_EXP',    label: 'Depot'      },
+  { value: 'EXPENDITURE',  label: 'Expense'    },
+  { value: 'ASHOK_DEPOT',  label: 'Ashok'      },
+  { value: 'TRUCK',        label: 'Truck'      },
+  { value: 'PANKAJ_PLASH', label: 'Pankaj'     },
+  { value: 'AMAN_PLASH',   label: 'Aman'       },
+  { value: 'BROKEN_BUY',   label: 'Broken Buy' },
+  { value: 'BROKEN_SELL',  label: 'Broken Sell'},
 ]
 
 const CAT_VALUES = new Set(CATEGORY_CHIPS.map(c => c.value))
@@ -24,64 +24,46 @@ function getShortcut(name) {
   return name.slice(0, 2).toLowerCase()
 }
 
-export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = '', currentTab = '' }) {
-  const { owners, employees = [], addTransaction } = useApp()
+export default function InlineAddForm({ defaultCategory = '', currentTab = '' }) {
+  const { employees = [], addTransaction } = useApp()
 
-  const isOwnerMode = defaultMode === 'OWNER'
+  const fixedEmps    = employees.filter(e => e.type === 'FIXED')
+  const variableEmps = employees.filter(e => e.type === 'VARIABLE')
+  const allEmps      = [...fixedEmps, ...variableEmps]
 
-  const [amount, setAmount]         = useState('')
-  const [description, setDesc]      = useState('')
-  const [payMode, setPayMode]       = useState('CASH')
-  const [ownerId, setOwnerId]       = useState(owners[0]?.id || '')
-  const [linkedPartnerId, setLinkedPartnerId] = useState('')
-  const [employeeId, setEmployeeId] = useState('')
-
-  // Unified destination chips (categories + will show partner inline too)
   const initSelected = () => {
     const s = new Set()
     if (defaultCategory && CAT_VALUES.has(defaultCategory)) s.add(defaultCategory)
     else if (CAT_VALUES.has(currentTab)) s.add(currentTab)
     return s
   }
-  const [selected, setSelected] = useState(initSelected)
 
-  const [date, setDate]             = useState(todayISO())
-  const [error, setError]           = useState('')
-  const [success, setSuccess]       = useState(false)
+  const [date, setDate]           = useState(todayISO())
+  const [amount, setAmount]       = useState('')
+  const [description, setDesc]    = useState('')
+  const [payMode, setPayMode]     = useState('CASH')
+  const [selected, setSelected]   = useState(initSelected)
+  const [employeeId, setEmpId]    = useState('')
+  const [error, setError]         = useState('')
+  const [success, setSuccess]     = useState(false)
   const [lastAction, setLastAction] = useState('')
 
-  const fixedEmps    = employees.filter(e => e.type === 'FIXED')
-  const variableEmps = employees.filter(e => e.type === 'VARIABLE')
-  const allEmps      = [...fixedEmps, ...variableEmps]
-
-  const initSelected2 = () => {
-    const s = new Set()
-    if (defaultCategory && CAT_VALUES.has(defaultCategory)) s.add(defaultCategory)
-    else if (CAT_VALUES.has(currentTab)) s.add(currentTab)
-    return s
-  }
-
   const reset = () => {
-    setAmount(''); setDesc(''); setLinkedPartnerId(''); setError('')
-    setPayMode('CASH'); setDate(todayISO()); setEmployeeId('')
-    setSelected(initSelected2())
+    setAmount(''); setDesc(''); setError(''); setEmpId('')
+    setPayMode('CASH'); setDate(todayISO()); setSelected(initSelected())
   }
 
-  const toggleCat = (val) => {
+  const toggleCat = (val) =>
     setSelected(prev => {
       const next = new Set(prev)
       next.has(val) ? next.delete(val) : next.add(val)
       return next
     })
-  }
-
-  const togglePartner = (id) =>
-    setLinkedPartnerId(prev => prev === id ? '' : id)
 
   const fillEmployee = (emp) => {
     const isSalary = emp.type === 'FIXED'
     setDesc(`${isSalary ? 'Salary' : 'Labour'} - ${emp.name}`)
-    setEmployeeId(emp.id)
+    setEmpId(emp.id)
     setSelected(prev => {
       const next = new Set(prev)
       next.add(isSalary ? 'SALARY' : 'LABOUR')
@@ -90,7 +72,7 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
   }
 
   const handleDescChange = (val) => {
-    setDesc(val)
+    setDesc(val); setEmpId('')
     const typed = val.trim().toLowerCase()
     if (!typed) return
     const match = allEmps.find(e => getShortcut(e.name) === typed)
@@ -104,15 +86,12 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
     return amt
   }
 
-  // Build transaction fields from selected chips
   const buildFields = () => {
     const cats = [...selected]
-    const primary = cats[0] || ''
-    const linked  = cats.length > 1 ? cats : cats.length === 1 ? cats : null
-    return { category: primary, linkedCategories: linked }
+    return { category: cats[0] || '', linkedCategories: cats.length ? cats : null }
   }
 
-  const handleCashIn = () => {
+  const handleCredit = () => {
     setError('')
     const amt = validate(); if (!amt) return
     const { category, linkedCategories } = buildFields()
@@ -120,15 +99,13 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
       date, amount: amt, description, category,
       type: TRANSACTION_TYPES.CASH_IN,
       paymentMode: payMode,
-      ownerId: null,
-      partnerId: linkedPartnerId || null,
-      linkedCategories,
+      ownerId: null, partnerId: null, linkedCategories,
     })
     setLastAction('IN'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
 
-  const handleCashOut = () => {
+  const handleDebit = () => {
     setError('')
     const amt = validate(); if (!amt) return
     const { category, linkedCategories } = buildFields()
@@ -136,140 +113,76 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
       date, amount: amt, description, category,
       type: TRANSACTION_TYPES.EXPENSE,
       paymentMode: payMode,
-      ownerId: null,
-      partnerId: linkedPartnerId || null,
-      employeeId: employeeId || null,
-      linkedCategories,
+      ownerId: null, partnerId: null,
+      employeeId: employeeId || null, linkedCategories,
     })
-    if (linkedPartnerId) {
-      const partner = owners.find(o => o.id === linkedPartnerId)
-      addTransaction({
-        date, amount: amt,
-        description: `${partner?.name} paid: ${description}`,
-        category: '', type: TRANSACTION_TYPES.OWNER_DEPOSIT,
-        paymentMode: '', ownerId: linkedPartnerId,
-      })
-    }
     setLastAction('OUT'); setSuccess(true); reset()
     setTimeout(() => setSuccess(false), 1200)
   }
 
-  const handleOwnerSave = (action) => {
-    setError('')
-    const amt = parseFloat(amount)
-    if (!amt || amt <= 0)    { setError('Enter amount'); return }
-    if (!description.trim()) { setError('Enter description'); return }
-    if (!ownerId)            { setError('Select partner'); return }
-    const type = action === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
-    addTransaction({ date, amount: amt, description, category: '', type, paymentMode: '', ownerId })
-    setSuccess(true); reset()
-    setTimeout(() => setSuccess(false), 1200)
-  }
-
-  const shortcutHints = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
-  const descPlaceholder = shortcutHints ? `Shortcut: ${shortcutHints}` : 'Description...'
-
   const hasSalaryLabour = selected.has('SALARY') || selected.has('LABOUR')
+  const shortcutHints   = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
 
   return (
-    <div className="mx-4 my-3 overflow-hidden shadow border border-gray-200 bg-white rounded-lg">
-      <div className="px-4 pb-4 pt-4 space-y-2.5">
+    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg"
+      style={{ borderTop: '4px solid #16A34A' }}>
+
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-gray-100" style={{ background: '#F0FDF4' }}>
+        <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#16A34A' }}>💵 Simple Form</p>
+        <p className="text-xs text-gray-400">Cash in Hand</p>
+      </div>
+
+      <div className="px-3 pt-3 pb-3 space-y-2">
 
         {/* Date + Amount */}
-        <div className="flex gap-2">
-          <input
-            type="date" value={date} onChange={e => setDate(e.target.value)}
-            className="w-36 bg-gray-50 border border-gray-200 rounded px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-          />
-          <input
-            type="number" min="1" placeholder="Amount ₹"
+        <div className="flex gap-1.5">
+          <input type="date" value={date} onChange={e => setDate(e.target.value)}
+            className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-200" />
+          <input type="number" min="1" placeholder="₹ Amount"
             value={amount} onChange={e => setAmount(e.target.value)}
-            className="flex-1 bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-xl font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
-          />
+            className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-base font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-200" />
         </div>
 
         {/* Description */}
-        <input
-          type="text" placeholder={descPlaceholder}
+        <input type="text"
+          placeholder={shortcutHints ? `Shortcut: ${shortcutHints}` : 'Description...'}
           value={description} onChange={e => handleDescChange(e.target.value)}
-          className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
-        />
+          className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-200" />
 
-        {/* ── UNIFIED DESTINATION ─────────────────────────────────────────── */}
-        {!isOwnerMode && (
-          <div className="bg-gray-50 border border-gray-200 rounded p-2.5 space-y-2">
+        {/* Category chips */}
+        <div className="flex flex-wrap gap-1">
+          {CATEGORY_CHIPS.map(c => {
+            const active = selected.has(c.value)
+            return (
+              <button key={c.value} type="button" onClick={() => toggleCat(c.value)}
+                className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
+                style={active
+                  ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
+                  : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }}>
+                {c.label}
+              </button>
+            )
+          })}
+        </div>
 
-            {/* Category chips */}
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Category</p>
-              <div className="flex flex-wrap gap-1.5">
-                {CATEGORY_CHIPS.map(c => {
-                  const active = selected.has(c.value)
-                  return (
-                    <button key={c.value} type="button" onClick={() => toggleCat(c.value)}
-                      className="px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"
-                      style={active
-                        ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
-                        : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }
-                      }>
-                      {c.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Partner chips */}
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">Partner</p>
-              <div className="flex flex-wrap gap-1.5">
-                {owners.map(o => {
-                  const active = linkedPartnerId === o.id
-                  return (
-                    <button key={o.id} type="button" onClick={() => togglePartner(o.id)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold border-2 transition-all"
-                      style={active
-                        ? { borderColor: o.color || '#F59E0B', background: o.color || '#F59E0B', color: '#fff' }
-                        : { borderColor: (o.color || '#F59E0B') + '50', background: (o.color || '#F59E0B') + '10', color: o.color || '#F59E0B' }
-                      }>
-                      <span className="w-4 h-4 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                        style={{ background: active ? 'rgba(255,255,255,0.35)' : o.color || '#F59E0B', fontSize: 9 }}>
-                        {o.name.charAt(0)}
-                      </span>
-                      {o.name.split(' ')[0]}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Employee quick-pick (when Salary or Labour selected) */}
-        {!isOwnerMode && hasSalaryLabour && (() => {
+        {/* Employee quick-pick */}
+        {hasSalaryLabour && (() => {
           const isSalary = selected.has('SALARY')
-          const pool = isSalary ? fixedEmps : variableEmps
+          const pool     = isSalary ? fixedEmps : variableEmps
           if (!pool.length) return null
           return (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1">
               {pool.map(emp => {
-                const sc = getShortcut(emp.name)
                 const active = employeeId === emp.id
                 return (
                   <button key={emp.id} type="button" onClick={() => fillEmployee(emp)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
+                    className="px-2 py-1 rounded text-xs font-bold border-2 transition-all"
                     style={active
                       ? { borderColor: isSalary ? '#7C3AED' : '#EA580C', background: isSalary ? '#8B5CF6' : '#F97316', color: '#fff' }
-                      : { borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }
-                    }>
-                    <span className="w-5 h-5 rounded flex items-center justify-center text-white font-bold text-xs"
-                      style={{ background: isSalary ? '#8B5CF6' : '#F97316' }}>
-                      {emp.name.charAt(0).toUpperCase()}
-                    </span>
+                      : { borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }}>
                     {emp.name.split(' ')[0]}
-                    {isSalary && emp.salary ? <span className="opacity-60">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
-                    <span className="ml-0.5 px-1 py-0.5 rounded font-mono text-white"
-                      style={{ background: 'rgba(0,0,0,0.2)', fontSize: 9 }}>{sc}</span>
+                    {isSalary && emp.salary ? <span className="opacity-60 ml-1">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
                   </button>
                 )
               })}
@@ -278,60 +191,33 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
         })()}
 
         {/* Pay mode */}
-        {!isOwnerMode && (
-          <div className="flex gap-2">
-            {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
-              <button key={opt.key} type="button" onClick={() => setPayMode(opt.key)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold border-2 transition-all"
-                style={payMode === opt.key
-                  ? { borderColor: '#3B82F6', background: '#EFF6FF', color: '#2563EB' }
-                  : { borderColor: '#E2E8F0', color: '#94A3B8' }
-                }>
-                {opt.icon} {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex gap-1.5">
+          {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
+            <button key={opt.key} type="button" onClick={() => setPayMode(opt.key)}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border-2 transition-all"
+              style={payMode === opt.key
+                ? { borderColor: '#3B82F6', background: '#EFF6FF', color: '#2563EB' }
+                : { borderColor: '#E2E8F0', color: '#94A3B8' }}>
+              {opt.icon} {opt.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Partner select (OWNER mode only) */}
-        {isOwnerMode && (
-          <select value={ownerId} onChange={e => setOwnerId(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
-            {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-          </select>
-        )}
+        {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
 
-        {/* Error */}
-        {error && <p className="text-xs text-red-500 font-semibold px-1">{error}</p>}
-
-        {/* Action buttons */}
-        {isOwnerMode ? (
-          <div className="flex gap-2">
-            <button type="button" onClick={() => handleOwnerSave('DEPOSIT')}
-              className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-wide transition-all active:scale-95"
-              style={{ background: success ? '#10B981' : 'linear-gradient(135deg,#10B981,#059669)' }}>
-              {success ? '✓ Saved!' : '⬆ Deposited'}
-            </button>
-            <button type="button" onClick={() => handleOwnerSave('WITHDRAWAL')}
-              className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-wide transition-all active:scale-95"
-              style={{ background: 'linear-gradient(135deg,#F43F5E,#E11D48)' }}>
-              ⬇ Personal
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <button type="button" onClick={handleCashIn}
-              className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-widest transition-all active:scale-95"
-              style={success && lastAction === 'IN' ? { background: '#34D399' } : { background: '#16A34A' }}>
-              {success && lastAction === 'IN' ? '✓ Saved!' : 'Credit'}
-            </button>
-            <button type="button" onClick={handleCashOut}
-              className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-widest transition-all active:scale-95"
-              style={success && lastAction === 'OUT' ? { background: '#FB7185' } : { background: '#DC2626' }}>
-              {success && lastAction === 'OUT' ? '✓ Saved!' : 'Debit'}
-            </button>
-          </div>
-        )}
+        {/* Credit / Debit */}
+        <div className="flex gap-1.5 pt-1">
+          <button type="button" onClick={handleCredit}
+            className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
+            style={{ background: success && lastAction === 'IN' ? '#34D399' : '#16A34A' }}>
+            {success && lastAction === 'IN' ? '✓ Saved!' : 'Credit'}
+          </button>
+          <button type="button" onClick={handleDebit}
+            className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
+            style={{ background: success && lastAction === 'OUT' ? '#FB7185' : '#DC2626' }}>
+            {success && lastAction === 'OUT' ? '✓ Saved!' : 'Debit'}
+          </button>
+        </div>
       </div>
     </div>
   )

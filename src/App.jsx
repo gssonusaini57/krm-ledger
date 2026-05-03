@@ -5,6 +5,7 @@ import TransactionForm from './components/TransactionForm'
 import SettingsModal from './components/SettingsModal'
 import PartnerDetail from './components/PartnerDetail'
 import EmployeeDetail from './components/EmployeeDetail'
+import AdvancePaymentForm from './components/AdvancePaymentForm'
 import {
   formatCurrency, isInflow, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
 } from './utils/helpers'
@@ -572,42 +573,30 @@ function MainApp() {
           </div>
         </div>
 
-        {/* ── DAILY LEDGER CARD ─────────────────────────────────────────── */}
-        <div className="px-3 pt-3 pb-2">
-          <div className="rounded-xl overflow-hidden" style={{ background: '#1B5C20' }}>
-            <div className="text-center py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
-              <p className="text-white/70 uppercase tracking-widest font-bold mb-1" style={{ fontSize: 11 }}>
-                {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash In Hand'}
-              </p>
-              <p className="font-bold text-yellow-400" style={{ fontSize: 26, lineHeight: 1 }}>
-                {formatCurrency(cashInHand, settings.currency)}
-              </p>
-            </div>
-            <div className="grid grid-cols-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="py-4 px-4 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                <p className="text-white/60 uppercase mb-1" style={{ fontSize: 11, letterSpacing: 0.5 }}>Total In (+)</p>
-                <p className="font-bold text-yellow-400" style={{ fontSize: 22 }}>
-                  {formatCurrency(monthFilter ? monthIn : todayIn, settings.currency)}
-                </p>
-              </div>
-              <div className="py-4 px-4 text-center">
-                <p className="text-white/60 uppercase mb-1" style={{ fontSize: 11, letterSpacing: 0.5 }}>Total Out (-)</p>
-                <p className="font-bold text-yellow-400" style={{ fontSize: 22 }}>
-                  {formatCurrency(monthFilter ? monthOut : todayOut, settings.currency)}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── INLINE ADD FORM ───────────────────────────────────────────── */}
+        {/* ── ENTRY FORMS (side-by-side) ────────────────────────────────── */}
         {tab !== 'STAFF' && (
-          <InlineAddForm
-            key={tab}
-            defaultMode={CATEGORY_TABS.has(tab) ? 'OUT' : INCOME_CATEGORY_TABS.has(tab) ? 'IN' : tab === 'IN' ? 'IN' : tab === 'OWNER' ? 'OWNER' : 'IN'}
-            defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
-            currentTab={tab}
-          />
+          <div className="mx-3 mt-3 mb-3 grid grid-cols-2 gap-2 items-start">
+
+            {/* Left — Cash in Hand + Simple Form */}
+            <div className="space-y-2">
+              <div className="rounded-lg px-3 py-2.5" style={{ background: '#1B5C20' }}>
+                <p className="text-white/60 uppercase tracking-widest font-bold" style={{ fontSize: 10 }}>
+                  {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash in Hand'}
+                </p>
+                <p className="font-bold text-yellow-400" style={{ fontSize: 22, lineHeight: 1.15 }}>
+                  {formatCurrency(cashInHand, settings.currency)}
+                </p>
+              </div>
+              <InlineAddForm
+                key={tab}
+                defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
+                currentTab={tab}
+              />
+            </div>
+
+            {/* Right — Partner Form */}
+            <AdvancePaymentForm key={`adv-${tab}`} />
+          </div>
         )}
 
         {/* ── STAFF VIEW ────────────────────────────────────────────────── */}

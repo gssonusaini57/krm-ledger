@@ -4,8 +4,8 @@ import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
 
 const MODES = [
-  { key: 'IN',    label: '💰 Cash In'  },
-  { key: 'OUT',   label: '💸 Cash Out' },
+  { key: 'IN',    label: '💰 Credit'   },
+  { key: 'OUT',   label: '💸 Debit'    },
   { key: 'OWNER', label: '👤 Partner'  },
 ]
 
@@ -149,7 +149,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             </div>
           )}
 
-          {/* Link to Partner — optional for Cash In/Out */}
+          {/* Link to Partner — optional for Credit/Debit */}
           {(tab === 'IN' || tab === 'OUT') && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Link to Partner</label>
@@ -197,7 +197,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             )
           })()}
 
-          {/* Cash / Online — Cash Out only */}
+          {/* Cash / Online — Debit only */}
           {tab === 'OUT' && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Paid via</label>
@@ -217,7 +217,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             </div>
           )}
 
-          {/* Partner paid this? — Cash Out only */}
+          {/* Partner paid this? — Debit only */}
           {tab === 'OUT' && !editData && (
             <div className="rounded-2xl border-2 p-4 transition-all"
               style={ownerPaid ? { borderColor: '#F59E0B', background: '#FFFBEB' } : { borderColor: '#E2E8F0', background: '#F8FAFC' }}>

@@ -120,7 +120,7 @@ export function AppProvider({ children }) {
         return bal
       }, 0)
 
-  // Returns partner's own deposits/withdrawals + any Cash In/Out linked to them
+  // Returns partner's own deposits/withdrawals + any Credit/Debit linked to them
   const getOwnerTransactions = (ownerId) =>
     transactions.filter(t => t.ownerId === ownerId || t.partnerId === ownerId)
 

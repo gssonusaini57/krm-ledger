@@ -8,7 +8,7 @@ export const TRANSACTION_TYPES = {
 }
 
 export const TYPE_LABELS = {
-  CASH_IN: 'Cash In',
+  CASH_IN: 'Credit',
   EXPENSE: 'Expense',
   OWNER_DEPOSIT: 'Owner Deposit',
   OWNER_WITHDRAWAL: 'Owner Withdrawal',

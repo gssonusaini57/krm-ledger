@@ -323,12 +323,12 @@ export default function InlineAddForm({ defaultMode = 'IN', defaultCategory = ''
             <button type="button" onClick={handleCashIn}
               className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-widest transition-all active:scale-95"
               style={success && lastAction === 'IN' ? { background: '#34D399' } : { background: '#16A34A' }}>
-              {success && lastAction === 'IN' ? '✓ Saved!' : 'Cash In'}
+              {success && lastAction === 'IN' ? '✓ Saved!' : 'Credit'}
             </button>
             <button type="button" onClick={handleCashOut}
               className="flex-1 py-3 rounded text-sm font-bold text-white uppercase tracking-widest transition-all active:scale-95"
               style={success && lastAction === 'OUT' ? { background: '#FB7185' } : { background: '#DC2626' }}>
-              {success && lastAction === 'OUT' ? '✓ Saved!' : 'Cash Out'}
+              {success && lastAction === 'OUT' ? '✓ Saved!' : 'Debit'}
             </button>
           </div>
         )}

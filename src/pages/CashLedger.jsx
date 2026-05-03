@@ -9,7 +9,7 @@ import {
 
 const TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
-  { value: TRANSACTION_TYPES.CASH_IN, label: 'Cash In' },
+  { value: TRANSACTION_TYPES.CASH_IN, label: 'Credit' },
   { value: TRANSACTION_TYPES.EXPENSE, label: 'Expense' },
   { value: TRANSACTION_TYPES.OWNER_DEPOSIT, label: 'Owner Deposit' },
   { value: TRANSACTION_TYPES.OWNER_WITHDRAWAL, label: 'Owner Withdrawal' },
@@ -147,8 +147,8 @@ export default function CashLedger() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cash In</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cash Out</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Credit</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Debit</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Balance</th>
                 <th className="px-4 py-3 no-print"></th>
               </tr>

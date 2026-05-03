@@ -31,8 +31,8 @@ const INCOME_CATEGORY_TABS = new Set(['BROKEN_SELL'])
 
 const NAV_MAIN = [
   { key: 'ALL',   label: 'All',     icon: LayoutList    },
-  { key: 'IN',    label: 'Cash In', icon: ArrowUpRight  },
-  { key: 'OUT',   label: 'Cash Out',icon: ArrowDownRight},
+  { key: 'IN',    label: 'Credit',  icon: ArrowUpRight  },
+  { key: 'OUT',   label: 'Debit',   icon: ArrowDownRight},
   { key: 'OWNER', label: 'Partner', icon: Users         },
   { key: 'STAFF', label: 'Staff',   icon: Briefcase     },
 ]
@@ -191,7 +191,7 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
         </div>
       </div>
 
-      {/* Partner Cash — each partner's own Cash In / Cash Out */}
+      {/* Partner Cash — each partner's own Credit / Debit */}
       <div className="px-3 py-3 space-y-2">
         <p className="text-white/40 text-xs uppercase tracking-wide px-1">Partner Cash</p>
         {partnerStats.map((owner, i) => {
@@ -210,14 +210,14 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
                 </div>
                 <p className="text-white/80 text-xs font-semibold">{owner.name.split(' ')[0]}</p>
               </div>
-              {/* Cash In / Cash Out rows */}
+              {/* Credit / Debit rows */}
               <div className="space-y-1 pl-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-white/40 text-xs">Cash In</span>
+                  <span className="text-white/40 text-xs">Credit</span>
                   <span className="font-bold text-xs text-emerald-400">{formatCurrency(owner.cashIn, settings.currency)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-white/40 text-xs">Cash Out</span>
+                  <span className="text-white/40 text-xs">Debit</span>
                   <span className="font-bold text-xs text-rose-400">{formatCurrency(owner.cashOut, settings.currency)}</span>
                 </div>
                 <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -466,11 +466,11 @@ function MainApp() {
     td{padding:7px 8px;border-bottom:1px solid #E2E8F0}tr:nth-child(even) td{background:#F8FAFC}</style></head><body>
     <h2>${settings.companyName||'KRM Rice Mill'}</h2><p style="color:#64748B;margin:0 0 16px">${periodLabel} — ${format(new Date(),'dd MMM yyyy')}</p>
     <div class="s">
-      <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CASH IN</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
-      <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">CASH OUT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
+      <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CREDIT</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
+      <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">DEBIT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
       <div class="b" style="background:#EFF6FF"><div style="font-size:10px;color:#2563EB;font-weight:bold">NET</div><div style="font-size:18px;font-weight:bold;color:#3B82F6">₹${(totalIn-totalOut).toLocaleString('en-IN')}</div></div>
     </div>
-    <table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Cash In</th><th style="text-align:right">Cash Out</th></tr></thead>
+    <table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Credit</th><th style="text-align:right">Debit</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`
   }
 
@@ -505,11 +505,11 @@ function MainApp() {
     td{padding:7px 8px;border-bottom:1px solid #E2E8F0}tr:nth-child(even) td{background:#F8FAFC}</style></head><body>
     <h2>${settings.companyName||'KRM Rice Mill'} — ${format(new Date(date),'dd MMMM yyyy')}</h2>
     <div class="s">
-      <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CASH IN</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
-      <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">CASH OUT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
+      <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CREDIT</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
+      <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">DEBIT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
       <div class="b" style="background:#EFF6FF"><div style="font-size:10px;color:#2563EB;font-weight:bold">NET</div><div style="font-size:18px;font-weight:bold;color:#3B82F6">₹${(totalIn-totalOut).toLocaleString('en-IN')}</div></div>
     </div>
-    <table><thead><tr><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Cash In</th><th style="text-align:right">Cash Out</th></tr></thead>
+    <table><thead><tr><th>Description</th><th>Category</th><th>Partner</th><th style="text-align:right">Credit</th><th style="text-align:right">Debit</th></tr></thead>
     <tbody>${rows}</tbody></table></body></html>`)
     win.document.close(); win.focus(); setTimeout(() => win.print(), 300)
   }

@@ -126,8 +126,8 @@ export default function PartnerDetail({ partner, onClose }) {
                     const typeLabel =
                       t.type === TRANSACTION_TYPES.OWNER_DEPOSIT    ? 'Deposited' :
                       t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL  ? 'Withdrew'  :
-                      t.type === TRANSACTION_TYPES.CASH_IN           ? 'Linked Cash In' :
-                                                                        'Linked Cash Out'
+                      t.type === TRANSACTION_TYPES.CASH_IN           ? 'Linked Credit'  :
+                                                                        'Linked Debit'
                     return (
                       <div key={t.id} className="bg-gray-50 rounded-2xl p-3.5 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"

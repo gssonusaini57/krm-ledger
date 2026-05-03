@@ -139,8 +139,8 @@ const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || 
 function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer = false }) {
 
   const { bankIn, bankOut } = useMemo(() => ({
-    bankIn:  transactions.filter(t => t.type === 'CASH_IN'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
-    bankOut: transactions.filter(t => t.type === 'EXPENSE'  && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
+    bankIn:  transactions.filter(t => (t.type === 'CASH_IN' || t.type === 'OWNER_DEPOSIT')    && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
+    bankOut: transactions.filter(t => (t.type === 'EXPENSE' || t.type === 'OWNER_WITHDRAWAL') && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
   }), [transactions])
 
   const partnerStats = useMemo(() =>

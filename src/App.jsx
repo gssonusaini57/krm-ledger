@@ -428,9 +428,15 @@ function MainApp() {
         if (!isP && !isL) return false
       }
       else if (CATEGORY_TABS.has(tab)) {
-        const byCategory = t.type === TRANSACTION_TYPES.EXPENSE && t.category === tab
-        const byLink = hasLinked(t, tab)
-        if (!byCategory && !byLink) return false
+        if (tab === 'BANK') {
+          // Bank tab: match any transaction paid/received via bank (paymentMode=ONLINE,
+          // category=BANK, or linkedCategory=BANK) — covers all 8 partner shortcuts
+          if (!isBankTxn(t)) return false
+        } else {
+          const byCategory = t.type === TRANSACTION_TYPES.EXPENSE && t.category === tab
+          const byLink = hasLinked(t, tab)
+          if (!byCategory && !byLink) return false
+        }
       }
       else if (INCOME_CATEGORY_TABS.has(tab)) {
         const byCategory = t.type === TRANSACTION_TYPES.CASH_IN && t.category === tab

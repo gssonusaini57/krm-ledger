@@ -15,13 +15,15 @@ export const TYPE_LABELS = {
 }
 
 export const INCOME_CATEGORIES = [
-  { value: 'RICE_SALES', label: 'Rice Sales' },
-  { value: 'PADDY_SALES', label: 'Paddy Sales' },
-  { value: 'BROKEN_SELL', label: 'Broken Sell' },
+  { value: 'RICE_SALES',      label: 'Rice Sales'      },
+  { value: 'PADDY_SALES',     label: 'Paddy Sales'     },
+  { value: 'BROKEN_SELL',     label: 'Broken Sell'     },
+  { value: 'HUSK_SELL',       label: 'Husk Sell'       },
+  { value: 'BRAN_SELL',       label: 'Bran Sell'       },
   { value: 'MILLING_CHARGES', label: 'Milling Charges' },
-  { value: 'BRAN_SALES', label: 'Rice Bran / Husk Sales' },
-  { value: 'LOAN_RECEIVED', label: 'Loan Received' },
-  { value: 'OTHER_INCOME', label: 'Other Income' },
+  { value: 'BRAN_SALES',      label: 'Bran / Husk Sales' },
+  { value: 'LOAN_RECEIVED',   label: 'Loan Received'   },
+  { value: 'OTHER_INCOME',    label: 'Other Income'    },
 ]
 
 export const EXPENSE_CATEGORIES = [

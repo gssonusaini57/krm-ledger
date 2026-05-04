@@ -13,7 +13,9 @@ const CATEGORY_CHIPS = [
   { value: 'PANKAJ_PLASH', label: 'Pankaj'     },
   { value: 'AMAN_PLASH',   label: 'Aman'       },
   { value: 'BROKEN_BUY',   label: 'Broken Buy' },
-  { value: 'BROKEN_SELL',  label: 'Broken Sell'},
+  { value: 'BROKEN_SELL',  label: 'Broken Sell' },
+  { value: 'HUSK_SELL',    label: 'Husk Sell'   },
+  { value: 'BRAN_SELL',    label: 'Bran Sell'   },
 ]
 
 const CAT_VALUES = new Set(CATEGORY_CHIPS.map(c => c.value))

@@ -22,13 +22,14 @@ const CAT_COLOR = {
   DEPOT_EXP:'#EC4899', EXPENDITURE:'#EF4444', ASHOK_DEPOT:'#14B8A6',
   TRUCK:'#F59E0B', PANKAJ_PLASH:'#3B82F6', AMAN_PLASH:'#10B981',
   BROKEN_BUY:'#DC2626', BROKEN_SELL:'#16A34A',
+  HUSK_SELL:'#F59E0B',  BRAN_SELL:'#92400E',
   PADDY_PURCHASE:'#84CC16', ELECTRICITY:'#3B82F6',
   TRANSPORT:'#F59E0B', MACHINE_MAINTENANCE:'#64748B', GUNNY_BAGS:'#A78BFA',
   DIESEL_FUEL:'#F97316', MISCELLANEOUS:'#94A3B8',
 }
 
 const CATEGORY_TABS       = new Set(['SALARY','LABOUR','BANK','DEPOT_EXP','EXPENDITURE','ASHOK_DEPOT','TRUCK','PANKAJ_PLASH','AMAN_PLASH','BROKEN_BUY'])
-const INCOME_CATEGORY_TABS = new Set(['BROKEN_SELL'])
+const INCOME_CATEGORY_TABS = new Set(['BROKEN_SELL', 'HUSK_SELL', 'BRAN_SELL'])
 
 const NAV_MAIN = [
   { key: 'ALL',   label: 'All',     icon: LayoutList    },
@@ -49,6 +50,8 @@ const NAV_EXPENSE = [
   { key: 'AMAN_PLASH',   label: 'Aman Plash',   icon: ShoppingBag  },
   { key: 'BROKEN_BUY',   label: 'Broken Buy',   icon: TrendingDown },
   { key: 'BROKEN_SELL',  label: 'Broken Sell',  icon: TrendingUp   },
+  { key: 'HUSK_SELL',    label: 'Husk Sell',    icon: TrendingUp   },
+  { key: 'BRAN_SELL',    label: 'Bran Sell',    icon: TrendingUp   },
 ]
 
 function dayLabel(dateStr) {

@@ -381,6 +381,7 @@ function MainApp() {
   const [toDate, setToDate]         = useState(todayISO())
   const [appliedFrom, setAppliedFrom] = useState(null)
   const [appliedTo, setAppliedTo]   = useState(null)
+  const [mobileForm, setMobileForm] = useState('simple')
 
   const isCashTxn = (t) => !t.paymentMode || t.paymentMode === 'CASH'
 
@@ -549,7 +550,7 @@ function MainApp() {
   const activeLabel = [...NAV_MAIN, ...NAV_EXPENSE].find(n => n.key === tab)?.label
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#F1F5F9' }}>
+    <div className="min-h-screen" style={{ background: '#F1F5F9' }}>
 
       {/* ── ALWAYS-VISIBLE SIDEBAR ───────────────────────────────────────── */}
       <Sidebar activeTab={tab} onTabChange={switchTab} companyName={settings.companyName} />
@@ -563,7 +564,7 @@ function MainApp() {
       />
 
       {/* ── MAIN CONTENT (between both sidebars) ────────────────────────── */}
-      <div className="flex flex-col flex-1 md:ml-[200px] md:mr-[200px]">
+      <div className="md:ml-[200px] md:mr-[200px]">
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-20" style={{ background: '#1B5C20' }}>
@@ -623,15 +624,34 @@ function MainApp() {
           </div>
         )}
 
-        {/* ── ENTRY FORMS (stack on mobile, side-by-side on desktop) ─────── */}
+        {/* ── ENTRY FORMS (tab-switch on mobile, side-by-side on desktop) ── */}
         {tab !== 'STAFF' && (
-          <div className="mx-3 mt-2 mb-3 grid grid-cols-1 md:grid-cols-2 gap-2 md:items-stretch">
-            <InlineAddForm
-              key={tab}
-              defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
-              currentTab={tab}
-            />
-            <AdvancePaymentForm key={`adv-${tab}`} />
+          <div className="mx-3 mt-2 mb-3">
+            {/* Mobile form tab switcher */}
+            <div className="flex md:hidden gap-1.5 mb-2">
+              {[{ key: 'simple', label: '💵 Simple' }, { key: 'partner', label: '⚡ Partner' }].map(f => (
+                <button key={f.key} type="button" onClick={() => setMobileForm(f.key)}
+                  className="flex-1 py-1.5 rounded text-xs font-bold transition-all"
+                  style={mobileForm === f.key
+                    ? { background: f.key === 'simple' ? '#16A34A' : '#7C3AED', color: '#fff' }
+                    : { background: '#E2E8F0', color: '#64748B' }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {/* Forms grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:items-stretch">
+              <div className={mobileForm === 'simple' ? 'block' : 'hidden md:block'}>
+                <InlineAddForm
+                  key={tab}
+                  defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
+                  currentTab={tab}
+                />
+              </div>
+              <div className={mobileForm === 'partner' ? 'block' : 'hidden md:block'}>
+                <AdvancePaymentForm key={`adv-${tab}`} />
+              </div>
+            </div>
           </div>
         )}
 
@@ -767,7 +787,7 @@ function MainApp() {
         )}
 
         {/* ── TRANSACTION LIST ──────────────────────────────────────────── */}
-        <div className="flex-1 px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        <div className="px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
           {grouped.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3">

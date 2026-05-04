@@ -207,7 +207,7 @@ export default function AdvancePaymentForm() {
     : partner?.color || '#7C3AED'
 
   return (
-    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg flex flex-col h-full"
+    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg flex flex-col md:h-full"
       style={{ borderTop: '4px solid #7C3AED' }}>
 
       {/* Header */}

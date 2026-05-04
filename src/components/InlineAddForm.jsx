@@ -126,7 +126,7 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
   const shortcutHints   = allEmps.map(e => `${getShortcut(e.name)}=${e.name.split(' ')[0]}`).join(', ')
 
   return (
-    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg flex flex-col h-full"
+    <div className="overflow-hidden shadow border border-gray-200 bg-white rounded-lg flex flex-col md:h-full"
       style={{ borderTop: '4px solid #16A34A' }}>
 
       {/* Header */}

@@ -133,91 +133,97 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
         <p className="text-xs text-gray-400">Cash in Hand</p>
       </div>
 
-      <div className="px-3 pt-3 pb-3 space-y-2 flex flex-col flex-1">
+      <div className="px-3 pt-3 pb-3 flex flex-col flex-1 justify-between gap-3">
 
-        {/* Date + Amount */}
-        <div className="flex gap-1.5">
-          <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-200" />
-          <input type="number" min="1" placeholder="₹ Amount"
-            value={amount} onChange={e => setAmount(e.target.value)}
-            className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-base font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-200" />
-        </div>
+        {/* ── Fields ───────────────────────────────────────────────────── */}
+        <div className="space-y-2">
 
-        {/* Description */}
-        <input type="text"
-          placeholder={shortcutHints ? `Shortcut: ${shortcutHints}` : 'Description...'}
-          value={description} onChange={e => handleDescChange(e.target.value)}
-          className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-200" />
+          {/* Date + Amount */}
+          <div className="flex gap-1.5">
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-200" />
+            <input type="number" min="1" placeholder="₹ Amount"
+              value={amount} onChange={e => setAmount(e.target.value)}
+              className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-base font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-200" />
+          </div>
 
-        {/* Category chips */}
-        <div className="flex flex-wrap gap-1">
-          {CATEGORY_CHIPS.map(c => {
-            const active = selected.has(c.value)
+          {/* Description */}
+          <input type="text"
+            placeholder={shortcutHints ? `Shortcut: ${shortcutHints}` : 'Description...'}
+            value={description} onChange={e => handleDescChange(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-2 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-200" />
+
+          {/* Category chips */}
+          <div className="flex flex-wrap gap-1">
+            {CATEGORY_CHIPS.map(c => {
+              const active = selected.has(c.value)
+              return (
+                <button key={c.value} type="button" onClick={() => toggleCat(c.value)}
+                  className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
+                  style={active
+                    ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
+                    : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }}>
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Employee quick-pick */}
+          {hasSalaryLabour && (() => {
+            const isSalary = selected.has('SALARY')
+            const pool     = isSalary ? fixedEmps : variableEmps
+            if (!pool.length) return null
             return (
-              <button key={c.value} type="button" onClick={() => toggleCat(c.value)}
-                className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
-                style={active
-                  ? { borderColor: '#6366F1', background: '#6366F1', color: '#fff' }
-                  : { borderColor: '#E2E8F0', background: '#fff', color: '#94A3B8' }}>
-                {c.label}
-              </button>
+              <div className="flex flex-wrap gap-1">
+                {pool.map(emp => {
+                  const active = employeeId === emp.id
+                  return (
+                    <button key={emp.id} type="button" onClick={() => fillEmployee(emp)}
+                      className="px-2 py-1 rounded text-xs font-bold border-2 transition-all"
+                      style={active
+                        ? { borderColor: isSalary ? '#7C3AED' : '#EA580C', background: isSalary ? '#8B5CF6' : '#F97316', color: '#fff' }
+                        : { borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }}>
+                      {emp.name.split(' ')[0]}
+                      {isSalary && emp.salary ? <span className="opacity-60 ml-1">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
             )
-          })}
+          })()}
+
+          {/* Pay mode */}
+          <div className="flex gap-1.5">
+            {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
+              <button key={opt.key} type="button" onClick={() => setPayMode(opt.key)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border-2 transition-all"
+                style={payMode === opt.key
+                  ? { borderColor: '#3B82F6', background: '#EFF6FF', color: '#2563EB' }
+                  : { borderColor: '#E2E8F0', color: '#94A3B8' }}>
+                {opt.icon} {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Employee quick-pick */}
-        {hasSalaryLabour && (() => {
-          const isSalary = selected.has('SALARY')
-          const pool     = isSalary ? fixedEmps : variableEmps
-          if (!pool.length) return null
-          return (
-            <div className="flex flex-wrap gap-1">
-              {pool.map(emp => {
-                const active = employeeId === emp.id
-                return (
-                  <button key={emp.id} type="button" onClick={() => fillEmployee(emp)}
-                    className="px-2 py-1 rounded text-xs font-bold border-2 transition-all"
-                    style={active
-                      ? { borderColor: isSalary ? '#7C3AED' : '#EA580C', background: isSalary ? '#8B5CF6' : '#F97316', color: '#fff' }
-                      : { borderColor: isSalary ? '#8B5CF6' : '#F97316', background: isSalary ? '#F5F3FF' : '#FFF7ED', color: isSalary ? '#7C3AED' : '#EA580C' }}>
-                    {emp.name.split(' ')[0]}
-                    {isSalary && emp.salary ? <span className="opacity-60 ml-1">₹{Number(emp.salary).toLocaleString('en-IN')}</span> : null}
-                  </button>
-                )
-              })}
-            </div>
-          )
-        })()}
-
-        {/* Pay mode */}
-        <div className="flex gap-1.5">
-          {[{ key: 'CASH', icon: '💵', label: 'Cash' }, { key: 'ONLINE', icon: '📱', label: 'Online' }].map(opt => (
-            <button key={opt.key} type="button" onClick={() => setPayMode(opt.key)}
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border-2 transition-all"
-              style={payMode === opt.key
-                ? { borderColor: '#3B82F6', background: '#EFF6FF', color: '#2563EB' }
-                : { borderColor: '#E2E8F0', color: '#94A3B8' }}>
-              {opt.icon} {opt.label}
+        {/* ── Buttons (always at bottom) ────────────────────────────────── */}
+        <div className="space-y-1.5">
+          {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+          <div className="flex gap-1.5">
+            <button type="button" onClick={handleCredit}
+              className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
+              style={{ background: success && lastAction === 'IN' ? '#34D399' : '#16A34A' }}>
+              {success && lastAction === 'IN' ? '✓ Saved!' : 'Credit'}
             </button>
-          ))}
+            <button type="button" onClick={handleDebit}
+              className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
+              style={{ background: success && lastAction === 'OUT' ? '#FB7185' : '#DC2626' }}>
+              {success && lastAction === 'OUT' ? '✓ Saved!' : 'Debit'}
+            </button>
+          </div>
         </div>
 
-        {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
-
-        {/* Credit / Debit — pinned to bottom */}
-        <div className="flex gap-1.5 pt-1 mt-auto">
-          <button type="button" onClick={handleCredit}
-            className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
-            style={{ background: success && lastAction === 'IN' ? '#34D399' : '#16A34A' }}>
-            {success && lastAction === 'IN' ? '✓ Saved!' : 'Credit'}
-          </button>
-          <button type="button" onClick={handleDebit}
-            className="flex-1 py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
-            style={{ background: success && lastAction === 'OUT' ? '#FB7185' : '#DC2626' }}>
-            {success && lastAction === 'OUT' ? '✓ Saved!' : 'Debit'}
-          </button>
-        </div>
       </div>
     </div>
   )

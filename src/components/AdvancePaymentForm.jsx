@@ -216,7 +216,8 @@ export default function AdvancePaymentForm() {
         <p className="text-xs text-gray-400">All partner transactions</p>
       </div>
 
-      <div className="px-3 pt-3 pb-3 space-y-2 flex flex-col flex-1">
+      <div className="px-3 pt-3 pb-3 flex flex-col flex-1 justify-between gap-3">
+        <div className="space-y-2">
 
         {/* Flow preview */}
         <div className="flex items-center gap-1 text-xs">
@@ -324,14 +325,17 @@ export default function AdvancePaymentForm() {
           </div>
         )}
 
-        {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+        </div>
 
-        {/* Submit — pinned to bottom */}
-        <button type="button" onClick={handleSubmit}
-          className="w-full py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95 mt-auto"
-          style={{ background: success ? '#34D399' : '#7C3AED' }}>
-          {success ? '✓ Saved!' : 'Submit'}
-        </button>
+        {/* ── Button (always at bottom) ─────────────────────────────────── */}
+        <div className="space-y-1.5">
+          {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+          <button type="button" onClick={handleSubmit}
+            className="w-full py-2.5 rounded text-xs font-bold text-white uppercase tracking-widest transition-all active:scale-95"
+            style={{ background: success ? '#34D399' : '#7C3AED' }}>
+            {success ? '✓ Saved!' : 'Submit'}
+          </button>
+        </div>
 
       </div>
     </div>

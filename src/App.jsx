@@ -623,9 +623,9 @@ function MainApp() {
           </div>
         )}
 
-        {/* ── ENTRY FORMS (side-by-side, same height) ──────────────────── */}
+        {/* ── ENTRY FORMS (stack on mobile, side-by-side on desktop) ─────── */}
         {tab !== 'STAFF' && (
-          <div className="mx-3 mt-2 mb-3 grid grid-cols-2 gap-2 items-stretch">
+          <div className="mx-3 mt-2 mb-3 grid grid-cols-1 md:grid-cols-2 gap-2 md:items-stretch">
             <InlineAddForm
               key={tab}
               defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
@@ -667,8 +667,8 @@ function MainApp() {
 
           {/* Card */}
           <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2.5">
-            {/* Row 1: Search + PDF + Print */}
-            <div className="flex gap-2">
+            {/* Row 1: Search (full-width) + action buttons below on mobile */}
+            <div className="flex flex-col md:flex-row gap-2">
               <div className="flex-1 relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input type="text" placeholder="Search description..."
@@ -680,32 +680,34 @@ function MainApp() {
                   </button>
                 )}
               </div>
-              <button onClick={handlePDF}
-                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold text-white flex-shrink-0"
-                style={{ background: '#DC2626' }}>
-                <FileText size={13} /> PDF
-              </button>
-              <button onClick={handlePrint}
-                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold text-white flex-shrink-0"
-                style={{ background: '#3B82F6' }}>
-                <Printer size={13} /> Print
-              </button>
-              <button onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()) }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded text-xs font-bold flex-shrink-0 transition-all"
-                style={selectMode
-                  ? { background: '#F43F5E', color: '#fff' }
-                  : { background: '#FEE2E2', color: '#DC2626' }}>
-                {selectMode ? '✕ Cancel' : <><Trash2 size={12} />&nbsp;Select</>}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={handlePDF}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded text-xs font-bold text-white"
+                  style={{ background: '#DC2626' }}>
+                  <FileText size={13} /> PDF
+                </button>
+                <button onClick={handlePrint}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded text-xs font-bold text-white"
+                  style={{ background: '#3B82F6' }}>
+                  <Printer size={13} /> Print
+                </button>
+                <button onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()) }}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded text-xs font-bold transition-all"
+                  style={selectMode
+                    ? { background: '#F43F5E', color: '#fff' }
+                    : { background: '#FEE2E2', color: '#DC2626' }}>
+                  {selectMode ? '✕ Cancel' : <><Trash2 size={12} />&nbsp;Select</>}
+                </button>
+              </div>
             </div>
 
             {/* Row 2: Date range filter */}
             <div className="flex items-center gap-2 flex-wrap">
               <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
+                className="flex-1 md:flex-none bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
               <span className="text-xs text-gray-400 font-medium">to</span>
               <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
+                className="flex-1 md:flex-none bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
               <button onClick={handleFilterApply}
                 className="px-4 py-1.5 rounded text-xs font-bold text-white transition-all active:scale-95"
                 style={{ background: '#1B5C20' }}>
@@ -744,20 +746,20 @@ function MainApp() {
 
         {/* ── PARTNER CARDS ─────────────────────────────────────────────── */}
         {tab === 'OWNER' && (
-          <div className="flex gap-2.5 px-3 pb-2 overflow-x-auto scrollbar-thin">
+          <div className="grid grid-cols-3 gap-2 px-3 pb-2 md:flex md:gap-2.5 md:overflow-x-auto md:scrollbar-thin">
             {owners.map((owner, i) => {
               const bal = getOwnerBalance(owner.id)
               const color = owner.color || OWNER_COLORS[i]
               return (
                 <div key={owner.id} onClick={() => setSelectedPartner(owner)}
-                  className="flex-shrink-0 rounded-xl p-3 text-white cursor-pointer active:scale-95 transition-transform"
-                  style={{ background: `linear-gradient(135deg, ${color}, ${color}BB)`, minWidth: 130 }}>
-                  <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs mb-2">
+                  className="rounded-xl p-2.5 text-white cursor-pointer active:scale-95 transition-transform md:flex-shrink-0 md:min-w-[130px]"
+                  style={{ background: `linear-gradient(135deg, ${color}, ${color}BB)` }}>
+                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs mb-1.5">
                     {owner.name.charAt(0)}
                   </div>
                   <p className="font-semibold text-xs text-white/90 truncate">{owner.name.split(' ')[0]}</p>
-                  <p className="font-bold text-base mt-0.5">{formatCurrency(Math.abs(bal), settings.currency)}</p>
-                  <p className="text-white/40 text-xs mt-0.5">Tap for details</p>
+                  <p className="font-bold text-sm mt-0.5">{formatCurrency(Math.abs(bal), settings.currency)}</p>
+                  <p className="text-white/40 text-xs mt-0.5 hidden md:block">Tap for details</p>
                 </div>
               )
             })}

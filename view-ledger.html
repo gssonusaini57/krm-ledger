@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KRM Ledger — View Only</title>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F1F5F9; min-height: 100vh; }
+    button { font-family: inherit; }
+    input { font-family: inherit; }
+
+    #sidebar {
+      display: none;
+      flex-direction: column;
+      position: fixed; left: 0; top: 0; height: 100%; width: 200px;
+      background: #0F1923;
+      border-right: 1px solid rgba(255,255,255,0.07);
+      overflow-y: auto; z-index: 30;
+    }
+    #report-panel {
+      display: none;
+      flex-direction: column;
+      position: fixed; right: 0; top: 0; height: 100%; width: 200px;
+      background: #0F1923;
+      border-left: 1px solid rgba(255,255,255,0.07);
+      overflow-y: auto; z-index: 30;
+    }
+    @media (min-width: 768px) {
+      #sidebar     { display: flex; }
+      #report-panel{ display: flex; }
+      #main-content{ margin-left: 200px; margin-right: 200px; }
+      .mobile-only { display: none !important; }
+    }
+    @media (max-width: 767px) {
+      .desktop-only { display: none !important; }
+    }
+
+    .sidebar-brand {
+      display: flex; align-items: center; gap: 10px; padding: 16px;
+      background: #1B5C20; border-bottom: 1px solid rgba(255,255,255,0.1);
+      flex-shrink: 0;
+    }
+    .sidebar-brand-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+    }
+    .sidebar-nav-item {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 12px 16px; border: none; background: none; cursor: pointer;
+      text-align: left; border-left: 3px solid transparent;
+      color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500;
+      transition: background 0.15s;
+    }
+    .sidebar-nav-item.active {
+      background: rgba(255,255,255,0.08);
+      border-left-color: #818CF8; color: #A5B4FC;
+    }
+    .sidebar-cat-item {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 10px 16px; border: none; background: none; cursor: pointer;
+      text-align: left; border-left: 3px solid transparent;
+      color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 400;
+      transition: background 0.15s;
+    }
+    .sidebar-section-label {
+      font-size: 10px; color: rgba(255,255,255,0.25); font-weight: 700;
+      letter-spacing: 1px; padding: 8px 16px 4px; text-transform: uppercase;
+    }
+
+    .main-header {
+      position: sticky; top: 0; z-index: 20; background: #1B5C20;
+    }
+    .main-header-inner {
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 48px; min-height: 54px; position: relative;
+    }
+    .view-only-badge {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: rgba(255,200,0,0.2); border: 1px solid rgba(255,200,0,0.35);
+      color: #FCD34D; font-size: 9px; font-weight: 800;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 6px;
+    }
+    .mobile-report-btn {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      width: 32px; height: 32px; border-radius: 10px;
+      background: rgba(255,255,255,0.12); border: none; cursor: pointer;
+      color: #fff; font-weight: 700; font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mobile-tabs {
+      display: flex; overflow-x: auto; gap: 6px; padding: 0 12px 8px;
+      scrollbar-width: none;
+    }
+    .mobile-tabs::-webkit-scrollbar { display: none; }
+    .mobile-tab-btn {
+      flex-shrink: 0; padding: 5px 12px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; border: none; cursor: pointer;
+      background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);
+      transition: all 0.15s;
+    }
+    .mobile-tab-btn.active { background: #fff; color: #1B5C20; }
+
+    .cash-banner {
+      margin: 12px; border-radius: 8px; padding: 10px 12px;
+      background: #1B5C20;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .txn-card {
+      background: #fff; border-radius: 12px; padding: 10px 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #F1F5F9;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .txn-icon {
+      width: 36px; height: 36px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* Mobile report drawer */
+    #mobile-report-overlay {
+      display: none; position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,0.6);
+    }
+    #mobile-report-drawer {
+      position: absolute; right: 0; top: 0; height: 100%; width: 280px;
+      background: #0F1923; display: flex; flex-direction: column;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F1F5F9">
+  <div style="text-align:center">
+    <div style="width:64px;height:64px;border-radius:16px;background:#F59E0B;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px">🌾</div>
+    <p style="color:#475569;font-weight:700;font-size:16px">KRM Ledger</p>
+    <p style="color:#94A3B8;font-size:13px;margin-top:4px">Loading...</p>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" style="display:none">
+
+  <!-- Left Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">🌾</div>
+      <span id="sidebar-name" style="color:#fff;font-weight:700;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">KRM Rice Mill</span>
+    </div>
+    <div id="sidebar-main" style="display:flex;flex-direction:column;padding:8px 0"></div>
+    <div style="height:1px;background:rgba(255,255,255,0.06);margin:2px 12px"></div>
+    <p class="sidebar-section-label">Categories</p>
+    <div id="sidebar-cats" style="display:flex;flex-direction:column;padding-bottom:16px"></div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="main-content">
+
+    <!-- Header -->
+    <div class="main-header">
+      <div class="main-header-inner">
+        <button class="mobile-report-btn mobile-only" onclick="document.getElementById('mobile-report-overlay').style.display='block'">R</button>
+        <span id="header-name" style="color:#fff;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:3px">KRM Rice Mill</span>
+        <div class="view-only-badge">View Only</div>
+      </div>
+      <div class="mobile-tabs mobile-only" id="mobile-tabs"></div>
+    </div>
+
+    <div id="cash-banner-wrap"></div>
+    <div id="filter-wrap"></div>
+    <div id="month-filter-wrap"></div>
+    <div id="partner-cards-wrap"></div>
+    <div id="txn-list-wrap" style="padding:0 12px;padding-bottom:max(24px,env(safe-area-inset-bottom))"></div>
+    <div id="staff-wrap"></div>
+
+  </div>
+
+  <!-- Right Report Panel -->
+  <div id="report-panel">
+    <div style="display:flex;align-items:center;justify-content:center;background:#1B5C20;min-height:50px;border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0">
+      <span style="color:#fff;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:3px">Report</span>
+    </div>
+    <div id="report-content"></div>
+  </div>
+
+</div>
+
+<!-- Mobile Report Drawer -->
+<div id="mobile-report-overlay" onclick="if(event.target===this)this.style.display='none'">
+  <div id="mobile-report-drawer">
+    <div style="background:#1B5C20;min-height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex-shrink:0">
+      <span style="color:#fff;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:3px">Report</span>
+      <button onclick="document.getElementById('mobile-report-overlay').style.display='none'"
+        style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.15);border:none;cursor:pointer;color:#fff;font-size:16px">✕</button>
+    </div>
+    <div id="mobile-report-content" style="overflow-y:auto;flex:1"></div>
+  </div>
+</div>
+
+<script>
+// ── Firebase ────────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyB9dbBmYD8G4bIRV3R9MiO9ouPpe8eg-v0",
+  authDomain: "krm-ledger.firebaseapp.com",
+  projectId: "krm-ledger",
+  storageBucket: "krm-ledger.firebasestorage.app",
+  messagingSenderId: "289491939235",
+  appId: "1:289491939235:web:5c5d09fceead458fc67416",
+})
+const db = firebase.firestore()
+
+// ── Constants ───────────────────────────────────────────────────────────────
+const CAT_COLOR = {
+  SALARY:'#8B5CF6',LABOUR:'#F97316',BANK:'#06B6D4',DEPOT_EXP:'#EC4899',
+  EXPENDITURE:'#EF4444',ASHOK_DEPOT:'#14B8A6',TRUCK:'#F59E0B',
+  PANKAJ_PLASH:'#3B82F6',AMAN_PLASH:'#10B981',BROKEN_BUY:'#DC2626',
+  BROKEN_SELL:'#16A34A',HUSK_SELL:'#F59E0B',BRAN_SELL:'#92400E',
+  PADDY_PURCHASE:'#84CC16',ELECTRICITY:'#3B82F6',TRANSPORT:'#F59E0B',
+  MACHINE_MAINTENANCE:'#64748B',GUNNY_BAGS:'#A78BFA',DIESEL_FUEL:'#F97316',
+  MISCELLANEOUS:'#94A3B8',
+}
+const CAT_LABEL = {
+  RICE_SALES:'Rice Sales',PADDY_SALES:'Paddy Sales',BROKEN_SELL:'Broken Sell',
+  HUSK_SELL:'Husk Sell',BRAN_SELL:'Bran Sell',MILLING_CHARGES:'Milling Charges',
+  BRAN_SALES:'Bran / Husk Sales',LOAN_RECEIVED:'Loan Received',OTHER_INCOME:'Other Income',
+  SALARY:'Salary',LABOUR:'Labour',BANK:'Bank',DEPOT_EXP:'Depot Exp',
+  EXPENDITURE:'Expenditure',ASHOK_DEPOT:'Ashok Depot',TRUCK:'Truck',
+  PANKAJ_PLASH:'Pankaj Plash',AMAN_PLASH:'Aman Plash',BROKEN_BUY:'Broken Buy',
+  PADDY_PURCHASE:'Paddy Purchase',LABOUR_SALARY:'Labour / Salary',
+  ELECTRICITY:'Electricity Bill',TRANSPORT:'Transport / Freight',
+  MACHINE_MAINTENANCE:'Machine Maintenance',GUNNY_BAGS:'Gunny Bags / Packaging',
+  DIESEL_FUEL:'Diesel / Fuel',WATER_CHARGES:'Water Charges',
+  BANK_CHARGES:'Bank / Interest Charges',TAX_GOVT:'Tax / Govt Fees',
+  MISCELLANEOUS:'Miscellaneous',
+}
+const NAV_MAIN = [
+  {key:'ALL',label:'All',icon:'≡'},
+  {key:'IN',label:'Credit',icon:'↑'},
+  {key:'OUT',label:'Debit',icon:'↓'},
+  {key:'OWNER',label:'Partner',icon:'👥'},
+  {key:'STAFF',label:'Staff',icon:'👔'},
+]
+const NAV_EXP = [
+  {key:'SALARY',label:'Salary'},{key:'LABOUR',label:'Labour'},
+  {key:'BANK',label:'Bank'},{key:'DEPOT_EXP',label:'Depot'},
+  {key:'EXPENDITURE',label:'Expense'},{key:'ASHOK_DEPOT',label:'Ashok'},
+  {key:'TRUCK',label:'Truck'},{key:'PANKAJ_PLASH',label:'Pankaj Plash'},
+  {key:'AMAN_PLASH',label:'Aman Plash'},{key:'BROKEN_BUY',label:'Broken Buy'},
+  {key:'BROKEN_SELL',label:'Broken Sell'},{key:'HUSK_SELL',label:'Husk Sell'},
+  {key:'BRAN_SELL',label:'Bran Sell'},
+]
+const CAT_TABS  = new Set(['SALARY','LABOUR','BANK','DEPOT_EXP','EXPENDITURE','ASHOK_DEPOT','TRUCK','PANKAJ_PLASH','AMAN_PLASH','BROKEN_BUY'])
+const INC_TABS  = new Set(['BROKEN_SELL','HUSK_SELL','BRAN_SELL'])
+const OWN_COLS  = ['#3B82F6','#10B981','#F59E0B']
+const DEF_OWN   = [
+  {id:'owner-1',name:'Karamjit Singh',color:'#3B82F6',sharePercent:34},
+  {id:'owner-2',name:'Sukhwinder Singh',color:'#10B981',sharePercent:33},
+  {id:'owner-3',name:'Jaswinder Singh',color:'#F59E0B',sharePercent:33},
+]
+const DEF_SET   = {companyName:'KRM Rice Mill',currency:'₹',openingBalance:0}
+
+// ── State ───────────────────────────────────────────────────────────────────
+const S = {
+  owners:DEF_OWN, settings:DEF_SET, employees:[], transactions:[],
+  cfgOk:false, txnOk:false,
+  tab:'ALL', search:'', monthFilter:null,
+  fromDate:todayISO(), toDate:todayISO(), appliedFrom:null, appliedTo:null,
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function todayISO(){ return new Date().toISOString().slice(0,10) }
+
+function fmt(n, cur){ cur=cur||'₹'
+  if(n==null) return cur+'0'
+  return cur+new Intl.NumberFormat('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2}).format(Math.abs(n))
+}
+function catLabel(c){ return CAT_LABEL[c]||c||'' }
+function isIn(type){ return type==='CASH_IN'||type==='OWNER_DEPOSIT' }
+function hasLinked(t,v){ return t.linkedCategory===v||(Array.isArray(t.linkedCategories)&&t.linkedCategories.includes(v)) }
+function isBankTxn(t){ return t.paymentMode==='ONLINE'||t.category==='BANK'||hasLinked(t,'BANK') }
+
+function dayLabel(ds){
+  const d=new Date(ds+'T00:00:00'), now=new Date()
+  now.setHours(0,0,0,0); d.setHours(0,0,0,0)
+  const yest=new Date(now); yest.setDate(now.getDate()-1)
+  if(d.getTime()===now.getTime()) return 'Today'
+  if(d.getTime()===yest.getTime()) return 'Yesterday'
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'})
+}
+function fmtMonthShort(k){ return new Date(k+'-01').toLocaleDateString('en-IN',{month:'short',year:'2-digit'}) }
+function fmtMonthLong(k){ return new Date(k+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'}) }
+function fmtCurrentMonth(){ return new Date().toLocaleDateString('en-IN',{month:'long',year:'numeric'}) }
+
+function H(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+// ── Compute ─────────────────────────────────────────────────────────────────
+function filtered(){
+  const {transactions:T,tab,search,monthFilter,appliedFrom,appliedTo}=S
+  return T.filter(t=>{
+    if(appliedFrom){ if(t.date<appliedFrom||t.date>appliedTo) return false }
+    else if(monthFilter&&!t.date.startsWith(monthFilter)) return false
+    if(tab==='IN'){ if(t.type!=='CASH_IN'&&t.type!=='OWNER_DEPOSIT') return false }
+    else if(tab==='OUT'){ if(t.type!=='EXPENSE') return false }
+    else if(tab==='OWNER'){
+      const isP=t.type==='OWNER_DEPOSIT'||t.type==='OWNER_WITHDRAWAL'
+      const isL=(t.partnerId||t.ownerId)&&(t.type==='CASH_IN'||t.type==='EXPENSE')
+      if(!isP&&!isL) return false
+    }
+    else if(CAT_TABS.has(tab)){
+      if(tab==='BANK'){ if(!isBankTxn(t)) return false }
+      else{ if(!(t.type==='EXPENSE'&&t.category===tab)&&!hasLinked(t,tab)) return false }
+    }
+    else if(INC_TABS.has(tab)){
+      if(!(t.type==='CASH_IN'&&t.category===tab)&&!hasLinked(t,tab)) return false
+    }
+    if(search.trim()){
+      const q=search.toLowerCase()
+      return (t.description||'').toLowerCase().includes(q)||catLabel(t.category).toLowerCase().includes(q)
+    }
+    return true
+  }).sort((a,b)=>b.date.localeCompare(a.date)||new Date(b.createdAt||0)-new Date(a.createdAt||0))
+}
+
+function grouped(){
+  const map={}
+  filtered().forEach(t=>{ if(!map[t.date])map[t.date]=[]; map[t.date].push(t) })
+  return Object.entries(map).sort((a,b)=>b[0].localeCompare(a[0]))
+}
+
+function availableMonths(){
+  const seen=new Set()
+  S.transactions.forEach(t=>seen.add(t.date.slice(0,7)))
+  return [...seen].sort().reverse().map(k=>({key:k,label:fmtMonthShort(k)}))
+}
+
+function cashInHand(){
+  return S.transactions.reduce((s,t)=>{
+    if(!(!t.paymentMode||t.paymentMode==='CASH')) return s
+    return s+(isIn(t.type)?t.amount:-t.amount)
+  },0)
+}
+
+function todayStats(){
+  const td=todayISO(), isCash=t=>!t.paymentMode||t.paymentMode==='CASH'
+  const t2=S.transactions.filter(t=>t.date===td)
+  return {
+    todayIn: t2.filter(t=>(t.type==='CASH_IN'||t.type==='OWNER_DEPOSIT')&&isCash(t)).reduce((s,t)=>s+t.amount,0),
+    todayOut:t2.filter(t=>(t.type==='EXPENSE'||t.type==='OWNER_WITHDRAWAL')&&isCash(t)).reduce((s,t)=>s+t.amount,0),
+  }
+}
+
+function bankStats(){
+  const T=S.transactions
+  return {
+    bankIn: T.filter(t=>(t.type==='CASH_IN'||t.type==='OWNER_DEPOSIT')&&isBankTxn(t)).reduce((s,t)=>s+t.amount,0),
+    bankOut:T.filter(t=>(t.type==='EXPENSE'||t.type==='OWNER_WITHDRAWAL')&&isBankTxn(t)).reduce((s,t)=>s+t.amount,0),
+  }
+}
+
+function partnerStats(){
+  return S.owners.map((o,i)=>{
+    const txns=S.transactions.filter(t=>t.ownerId===o.id||t.partnerId===o.id)
+    const isCash=t=>!t.paymentMode||t.paymentMode==='CASH'
+    const isOnl =t=>t.paymentMode==='ONLINE'
+    const isOut =t=>t.type==='OWNER_WITHDRAWAL'||t.type==='EXPENSE'
+    const cashIn  =txns.filter(t=>t.type==='OWNER_DEPOSIT'||t.type==='CASH_IN').reduce((s,t)=>s+t.amount,0)
+    const paidCash=txns.filter(t=>isOut(t)&&isCash(t)).reduce((s,t)=>s+t.amount,0)
+    const paidBank=txns.filter(t=>isOut(t)&&isOnl(t)).reduce((s,t)=>s+t.amount,0)
+    return {...o,cashIn,paidCash,paidBank,cashOut:paidCash+paidBank}
+  })
+}
+
+function ownerBal(id){
+  return S.transactions.filter(t=>t.ownerId===id).reduce((b,t)=>{
+    if(t.type==='OWNER_DEPOSIT') return b+t.amount
+    if(t.type==='OWNER_WITHDRAWAL') return b-t.amount
+    return b
+  },0)
+}
+
+function staffStats(emp){
+  const m=new Date().toISOString().slice(0,7)
+  const txns=S.transactions.filter(t=>t.employeeId===emp.id&&t.date.startsWith(m))
+  const paid=txns.reduce((s,t)=>s+t.amount,0)
+  return {paid,count:txns.length,remaining:emp.type==='FIXED'?(emp.salary||0)-paid:null}
+}
+
+// ── Report HTML (shared between right panel and mobile drawer) ──────────────
+function reportHTML(){
+  const cur=S.settings.currency||'₹'
+  const {bankIn,bankOut}=bankStats(), bb=bankIn-bankOut
+  const ps=partnerStats()
+  return `
+    <div style="padding:12px;border-bottom:1px solid rgba(255,255,255,0.07)">
+      <p style="color:rgba(255,255,255,0.4);font-size:10px;text-transform:uppercase;letter-spacing:2px;padding:0 4px;margin-bottom:8px">Bank</p>
+      <div style="border-radius:8px;padding:10px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="width:24px;height:24px;border-radius:6px;background:#3B82F6;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0">B</div>
+          <p style="color:rgba(255,255,255,0.8);font-size:11px;font-weight:600">Bank Account</p>
+        </div>
+        <div style="padding-left:4px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="color:rgba(255,255,255,0.4);font-size:11px">Bank In</span>
+            <span style="font-weight:700;font-size:11px;color:#34D399">${fmt(bankIn,cur)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="color:rgba(255,255,255,0.4);font-size:11px">Bank Out</span>
+            <span style="font-weight:700;font-size:11px;color:#FB7185">${fmt(bankOut,cur)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06)">
+            <span style="color:rgba(255,255,255,0.4);font-size:11px">Balance</span>
+            <span style="font-weight:700;font-size:11px;color:${bb>=0?'#FBBF24':'#FB7185'}">${fmt(bb,cur)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+      <p style="color:rgba(255,255,255,0.4);font-size:10px;text-transform:uppercase;letter-spacing:2px;padding:0 4px">Partner Balance</p>
+      ${ps.map((o,i)=>{
+        const color=o.color||OWN_COLS[i], pend=o.cashIn-o.cashOut
+        return `
+          <div style="border-radius:8px;padding:10px;background:rgba(255,255,255,0.05)">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <div style="width:28px;height:28px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;flex-shrink:0">${o.name.charAt(0)}</div>
+              <p style="color:rgba(255,255,255,0.8);font-size:11px;font-weight:600">${H(o.name.split(' ')[0])}</p>
+            </div>
+            <div style="padding-left:4px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <span style="color:rgba(255,255,255,0.4);font-size:11px">Received</span>
+                <span style="font-weight:700;font-size:11px;color:#34D399">+${fmt(o.cashIn,cur)}</span>
+              </div>
+              ${o.paidCash>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:rgba(255,255,255,0.4);font-size:11px">💵 Cash Paid</span><span style="font-weight:700;font-size:11px;color:#FB7185">−${fmt(o.paidCash,cur)}</span></div>`:''}
+              ${o.paidBank>0?`<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:rgba(255,255,255,0.4);font-size:11px">🏦 Bank Paid</span><span style="font-weight:700;font-size:11px;color:#FB7185">−${fmt(o.paidBank,cur)}</span></div>`:''}
+              <div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px solid rgba(255,255,255,0.06)">
+                <span style="color:rgba(255,255,255,0.6);font-size:11px;font-weight:700">Pending</span>
+                <span style="font-weight:700;font-size:11px;color:${pend>=0?'#FBBF24':'#FB7185'}">${fmt(Math.abs(pend),cur)}${pend<0?' <span style="opacity:.6">(cr)</span>':''}</span>
+              </div>
+            </div>
+          </div>
+        `
+      }).join('')}
+    </div>
+  `
+}
+
+// ── Render Functions ────────────────────────────────────────────────────────
+function renderSidebar(){
+  const {tab,settings}=S
+  const name=settings.companyName||'KRM Rice Mill'
+  document.getElementById('sidebar-name').textContent=name
+  document.getElementById('header-name').textContent=name
+
+  document.getElementById('sidebar-main').innerHTML=NAV_MAIN.map(n=>`
+    <button class="sidebar-nav-item${tab===n.key?' active':''}" onclick="switchTab('${n.key}')">
+      <span style="width:16px;text-align:center;font-size:15px">${n.icon}</span>
+      <span>${n.label}</span>
+    </button>`).join('')
+
+  document.getElementById('sidebar-cats').innerHTML=NAV_EXP.map(n=>{
+    const c=CAT_COLOR[n.key]||'#94A3B8', a=tab===n.key
+    return `<button class="sidebar-cat-item" onclick="switchTab('${n.key}')"
+      style="${a?`background:${c}18;border-left-color:${c};color:#fff;font-weight:600`:''}">
+      <span style="width:6px;height:6px;border-radius:50%;background:${a?c:'rgba(255,255,255,0.2)'};flex-shrink:0;display:inline-block"></span>
+      <span>${n.label}</span>
+    </button>`
+  }).join('')
+
+  document.getElementById('mobile-tabs').innerHTML=[...NAV_MAIN,...NAV_EXP].map(n=>`
+    <button class="mobile-tab-btn${tab===n.key?' active':''}" onclick="switchTab('${n.key}')">${n.label}</button>
+  `).join('')
+}
+
+function renderReport(){
+  const h=reportHTML()
+  document.getElementById('report-content').innerHTML=h
+  document.getElementById('mobile-report-content').innerHTML=h
+}
+
+function renderCashBanner(){
+  const el=document.getElementById('cash-banner-wrap')
+  if(S.tab==='STAFF'){el.innerHTML='';return}
+  const cur=S.settings.currency||'₹'
+  const {todayIn,todayOut}=todayStats()
+  const label=S.monthFilter?fmtMonthLong(S.monthFilter):'Cash in Hand'
+  el.innerHTML=`
+    <div class="cash-banner">
+      <div>
+        <p style="color:rgba(255,255,255,0.6);font-size:10px;text-transform:uppercase;letter-spacing:3px;font-weight:700">${label}</p>
+        <p style="font-weight:700;color:#FCD34D;font-size:22px;line-height:1.15">${fmt(cashInHand(),cur)}</p>
+      </div>
+      <div style="text-align:right;color:rgba(255,255,255,0.5);font-size:12px">
+        <div>Today ↑ <span style="color:#34D399;font-weight:700">${fmt(todayIn,cur)}</span></div>
+        <div>Today ↓ <span style="color:#FB7185;font-weight:700">${fmt(todayOut,cur)}</span></div>
+      </div>
+    </div>`
+}
+
+function renderFilter(){
+  const el=document.getElementById('filter-wrap')
+  if(S.tab==='STAFF'){el.innerHTML='';return}
+  const all=[...NAV_MAIN,...NAV_EXP]
+  const activeLabel=all.find(n=>n.key===S.tab)?.label||'All'
+  const c=CAT_COLOR[S.tab]||'#1B5C20'
+  const {appliedFrom,appliedTo,monthFilter,fromDate,toDate,search}=S
+  el.innerHTML=`
+    <div style="padding:8px 12px 4px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:4px;height:16px;border-radius:2px;background:${c};flex-shrink:0"></div>
+        <span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:1px">${activeLabel}</span>
+        ${appliedFrom?`<span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;margin-left:auto;background:#DCFCE7;color:#166534">${appliedFrom} – ${appliedTo}</span>`:''}
+        ${!appliedFrom&&monthFilter?`<span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;margin-left:auto;background:#FEF3C7;color:#92400E">${fmtMonthLong(monthFilter)}</span>`:''}
+      </div>
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px">
+        <div style="position:relative">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9CA3AF;font-size:13px">🔍</span>
+          <input id="search-input" type="text" placeholder="Search description..." value="${H(search)}"
+            oninput="onSearch(this.value)"
+            style="width:100%;padding:8px 28px 8px 32px;border:1px solid #E2E8F0;border-radius:6px;font-size:13px;color:#374151;background:#F9FAFB;outline:none">
+          <button id="search-clear" onclick="onSearch('')"
+            style="display:${search?'block':'none'};position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:#9CA3AF;cursor:pointer;font-size:14px">✕</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="date" value="${fromDate}" onchange="S.fromDate=this.value"
+            style="flex:1;min-width:120px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;color:#374151;background:#F9FAFB;outline:none">
+          <span style="font-size:12px;color:#9CA3AF;font-weight:500">to</span>
+          <input type="date" value="${toDate}" onchange="S.toDate=this.value"
+            style="flex:1;min-width:120px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;color:#374151;background:#F9FAFB;outline:none">
+          <button onclick="applyFilter()"
+            style="padding:6px 16px;border-radius:6px;background:#1B5C20;color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:700">Filter</button>
+          <button onclick="resetFilter()"
+            style="padding:6px 8px;border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:#1B5C20">Reset</button>
+        </div>
+      </div>
+    </div>`
+}
+
+function renderMonthFilter(){
+  const el=document.getElementById('month-filter-wrap')
+  if(S.tab==='STAFF'){el.innerHTML='';return}
+  const months=availableMonths()
+  if(!months.length){el.innerHTML='';return}
+  const {monthFilter,appliedFrom}=S
+  el.innerHTML=`
+    <div style="display:flex;gap:6px;padding:8px 12px;overflow-x:auto;scrollbar-width:thin">
+      <button onclick="setMonth(null)"
+        style="flex-shrink:0;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:${!monthFilter&&!appliedFrom?'#1B5C20':'#E2E8F0'};color:${!monthFilter&&!appliedFrom?'#fff':'#64748B'}">All</button>
+      ${months.map(m=>`
+        <button onclick="setMonth('${m.key}')"
+          style="flex-shrink:0;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;background:${monthFilter===m.key?'#F59E0B':'#E2E8F0'};color:${monthFilter===m.key?'#fff':'#64748B'}">${m.label}</button>
+      `).join('')}
+    </div>`
+}
+
+function renderPartnerCards(){
+  const el=document.getElementById('partner-cards-wrap')
+  if(S.tab!=='OWNER'){el.innerHTML='';return}
+  const cur=S.settings.currency||'₹'
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 12px 8px">
+      ${S.owners.map((o,i)=>{
+        const bal=ownerBal(o.id), c=o.color||OWN_COLS[i]
+        return `<div style="border-radius:12px;padding:10px;background:linear-gradient(135deg,${c},${c}BB);color:#fff">
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;margin-bottom:6px">${o.name.charAt(0)}</div>
+          <p style="font-weight:600;font-size:11px;color:rgba(255,255,255,0.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${H(o.name.split(' ')[0])}</p>
+          <p style="font-weight:700;font-size:13px;margin-top:2px">${fmt(Math.abs(bal),cur)}</p>
+        </div>`
+      }).join('')}
+    </div>`
+}
+
+function renderTxnList(){
+  const el=document.getElementById('txn-list-wrap')
+  if(S.tab==='STAFF'){el.innerHTML='';return}
+  const cur=S.settings.currency||'₹', grps=grouped()
+  if(!grps.length){
+    el.innerHTML=`
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center">
+        <div style="width:56px;height:56px;border-radius:16px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:24px">📋</div>
+        <p style="color:#6B7280;font-weight:600;font-size:13px">No entries found</p>
+        <p style="color:#9CA3AF;font-size:12px;margin-top:4px">Try adjusting the filters</p>
+      </div>`
+    return
+  }
+  el.innerHTML=grps.map(([date,txns])=>{
+    const net=txns.reduce((s,t)=>s+(isIn(t.type)?t.amount:-t.amount),0)
+    const nc=net>=0?'#059669':'#E11D48', nb=net>=0?'#ECFDF5':'#FFF1F2'
+    return `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <p style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;white-space:nowrap">${dayLabel(date)}</p>
+          <div style="flex:1;height:1px;background:#E5E7EB"></div>
+          <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:${nb};color:${nc};white-space:nowrap">${fmt(net,cur)}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${txns.map(t=>{
+            const inf=isIn(t.type)
+            const partner=t.ownerId?S.owners.find(o=>o.id===t.ownerId):t.partnerId?S.owners.find(o=>o.id===t.partnerId):null
+            const cc=CAT_COLOR[t.category]||(inf?'#10B981':'#F43F5E')
+            const cl=catLabel(t.category)
+            return `
+              <div class="txn-card">
+                <div class="txn-icon" style="background:${inf?'#ECFDF5':'#FFF1F2'}">
+                  <span style="color:${inf?'#10B981':'#F43F5E'};font-size:15px;font-weight:700">${inf?'↑':'↓'}</span>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <p style="font-weight:600;color:#111827;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${H(t.description||'')}</p>
+                  <div style="display:flex;align-items:center;gap:4px;margin-top:3px;flex-wrap:wrap">
+                    ${cl?`<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:999px;background:${cc}18;color:${cc}">${cl}</span>`:''}
+                    ${t.paymentMode?`<span style="font-size:9px;padding:2px 6px;border-radius:999px;background:#F1F5F9;color:#94A3B8">${t.paymentMode==='CASH'?'💵':'📱'}</span>`:''}
+                    ${partner?`<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:999px;background:${(partner.color||'#3B82F6')}15;color:${partner.color||'#3B82F6'}">${H(partner.name.split(' ')[0])}</span>`:''}
+                  </div>
+                </div>
+                <div style="flex-shrink:0;text-align:right">
+                  <p style="font-weight:700;font-size:13px;color:${inf?'#10B981':'#F43F5E'}">${inf?'+':'-'}${fmt(t.amount,cur)}</p>
+                </div>
+              </div>`
+          }).join('')}
+        </div>
+      </div>`
+  }).join('')
+}
+
+function renderStaff(){
+  const el=document.getElementById('staff-wrap')
+  if(S.tab!=='STAFF'){el.innerHTML='';return}
+  const cur=S.settings.currency||'₹', {employees}=S
+  if(!employees.length){
+    el.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;padding:80px 24px;text-align:center"><p style="color:#6B7280;font-weight:600;font-size:13px">No staff added yet</p></div>`
+    return
+  }
+  const fixed=employees.filter(e=>e.type==='FIXED'), variable=employees.filter(e=>e.type==='VARIABLE')
+  el.innerHTML=`
+    <div style="padding:8px 12px 32px">
+      <p style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding:0 4px">${fmtCurrentMonth()}</p>
+      ${fixed.length?`
+        <div style="margin-bottom:16px">
+          <p style="font-size:11px;font-weight:700;padding:0 4px;margin-bottom:8px;color:#8B5CF6">Fixed Salary</p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${fixed.map(emp=>{
+              const {paid,remaining}=staffStats(emp)
+              return `<div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #F1F5F9">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+                  <div style="width:40px;height:40px;border-radius:12px;background:#EDE9FE;display:flex;align-items:center;justify-content:center;color:#7C3AED;font-weight:700;font-size:14px;flex-shrink:0">${H(emp.name.charAt(0).toUpperCase())}</div>
+                  <div><p style="font-weight:700;color:#111827;font-size:13px">${H(emp.name)}</p><p style="font-size:11px;color:#9CA3AF">${fmt(emp.salary||0,cur)}/month</p></div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                  <div style="background:#F9FAFB;border-radius:10px;padding:8px;text-align:center"><p style="font-size:10px;color:#9CA3AF;margin-bottom:2px">Salary</p><p style="font-weight:700;color:#374151;font-size:11px">${fmt(emp.salary||0,cur)}</p></div>
+                  <div style="background:#FFF1F2;border-radius:10px;padding:8px;text-align:center"><p style="font-size:10px;color:#9CA3AF;margin-bottom:2px">Paid</p><p style="font-weight:700;color:#F43F5E;font-size:11px">${fmt(paid,cur)}</p></div>
+                  <div style="background:${remaining>=0?'#ECFDF5':'#FFF1F2'};border-radius:10px;padding:8px;text-align:center"><p style="font-size:10px;color:#9CA3AF;margin-bottom:2px">${remaining>=0?'Remaining':'Excess'}</p><p style="font-weight:700;font-size:11px;color:${remaining>=0?'#059669':'#E11D48'}">${fmt(Math.abs(remaining),cur)}</p></div>
+                </div>
+              </div>`
+            }).join('')}
+          </div>
+        </div>`:''}
+      ${variable.length?`
+        <div>
+          <p style="font-size:11px;font-weight:700;padding:0 4px;margin-bottom:8px;color:#F97316">Variable Labour</p>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${variable.map(emp=>{
+              const {paid,count}=staffStats(emp)
+              return `<div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #F1F5F9;display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#FFF7ED;display:flex;align-items:center;justify-content:center;color:#EA580C;font-weight:700;font-size:14px;flex-shrink:0">${H(emp.name.charAt(0).toUpperCase())}</div>
+                <div style="flex:1"><p style="font-weight:700;color:#111827;font-size:13px">${H(emp.name)}</p><p style="font-size:11px;color:#9CA3AF">${count} payment${count!==1?'s':''} this month</p></div>
+                <div style="text-align:right"><p style="font-size:10px;color:#9CA3AF">Total Paid</p><p style="font-weight:700;color:#F43F5E;font-size:13px">${fmt(paid,cur)}</p></div>
+              </div>`
+            }).join('')}
+          </div>
+        </div>`:''}
+    </div>`
+}
+
+function renderAll(){
+  renderSidebar(); renderReport(); renderCashBanner();
+  renderFilter(); renderMonthFilter(); renderPartnerCards();
+  renderTxnList(); renderStaff();
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+function switchTab(key){
+  S.tab=key; S.search=''; renderAll(); window.scrollTo(0,0)
+}
+function onSearch(val){
+  S.search=val
+  const inp=document.getElementById('search-input')
+  const clr=document.getElementById('search-clear')
+  if(inp&&inp.value!==val) inp.value=val
+  if(clr) clr.style.display=val?'block':'none'
+  renderTxnList()
+}
+function applyFilter(){ S.appliedFrom=S.fromDate; S.appliedTo=S.toDate; S.monthFilter=null; renderAll() }
+function resetFilter(){ S.appliedFrom=null; S.appliedTo=null; S.fromDate=todayISO(); S.toDate=todayISO(); renderAll() }
+function setMonth(k){ S.monthFilter=k; S.appliedFrom=null; S.appliedTo=null; renderAll() }
+
+// ── Firebase Listeners ───────────────────────────────────────────────────────
+function tryShow(){
+  if(!S.cfgOk||!S.txnOk) return
+  document.getElementById('loading').style.display='none'
+  document.getElementById('app').style.display='block'
+  renderAll()
+}
+
+db.doc('config/main').onSnapshot(snap=>{
+  if(snap.exists){
+    const d=snap.data()
+    S.owners   = d.owners   || DEF_OWN
+    S.settings = d.settings || DEF_SET
+    S.employees= d.employees|| []
+  }
+  S.cfgOk=true; tryShow()
+  if(S.cfgOk&&S.txnOk) renderAll()
+}, err=>{ console.error('Config error:',err) })
+
+db.collection('transactions').onSnapshot(snap=>{
+  S.transactions=snap.docs.map(d=>({id:d.id,...d.data()}))
+  S.txnOk=true; tryShow()
+  if(S.cfgOk&&S.txnOk) renderAll()
+}, err=>{ console.error('Transactions error:',err) })
+</script>
+</body>
+</html>

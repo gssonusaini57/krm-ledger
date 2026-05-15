@@ -108,8 +108,22 @@ export function AppProvider({ children }) {
 
   const getCompanyBalance = (txns = transactions) => {
     const opening = settings.openingBalance || 0
-    return txns.reduce((bal, t) => bal + (isInflow(t.type) ? t.amount : -t.amount), opening)
+    return txns.reduce((bal, t) => {
+      // Advance transfers are internal — they don't change total assets
+      if (t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN) return bal
+      // Depo expenses are real spend — reduce total assets
+      if (t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE) return bal - t.amount
+      return bal + (isInflow(t.type) ? t.amount : -t.amount)
+    }, opening)
   }
+
+  // Munim/Depo Advance balance: money currently held by Munim
+  const getMunimBalance = () =>
+    transactions.reduce((bal, t) => {
+      if (t.type === TRANSACTION_TYPES.ADVANCE_OUT)                                               return bal + t.amount
+      if (t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE || t.type === TRANSACTION_TYPES.ADVANCE_RETURN) return bal - t.amount
+      return bal
+    }, 0)
 
   const getOwnerBalance = (ownerId) =>
     transactions
@@ -153,7 +167,7 @@ export function AppProvider({ children }) {
       addTransaction, updateTransaction, deleteTransaction,
       updateOwner, updateSettings,
       addEmployee, updateEmployee, deleteEmployee,
-      getCompanyBalance, getOwnerBalance, getOwnerTransactions, getTotals,
+      getCompanyBalance, getOwnerBalance, getOwnerTransactions, getTotals, getMunimBalance,
     }}>
       {children}
     </AppContext.Provider>

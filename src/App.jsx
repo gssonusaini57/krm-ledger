@@ -13,8 +13,9 @@ import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
   Search, X as XIcon, Wheat, Printer, Users, FileText,
   LayoutList, Briefcase, Building2, Package, Receipt,
-  Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp
+  Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp,
 } from 'lucide-react'
+import DepoExpenseForm from './components/DepoExpenseForm'
 import { format, isToday, isYesterday } from 'date-fns'
 
 const CAT_COLOR = {
@@ -26,9 +27,14 @@ const CAT_COLOR = {
   PADDY_PURCHASE:'#84CC16', ELECTRICITY:'#3B82F6',
   TRANSPORT:'#F59E0B', MACHINE_MAINTENANCE:'#64748B', GUNNY_BAGS:'#A78BFA',
   DIESEL_FUEL:'#F97316', MISCELLANEOUS:'#94A3B8',
+  // Depo Expense categories
+  DEPO_LOADING:'#F97316', DEPO_TRANSPORT:'#06B6D4', DEPO_TOLL:'#8B5CF6',
+  DEPO_LABOUR:'#EC4899',  DEPO_TEA:'#84CC16',       DEPO_MISC:'#94A3B8',
+  // Advance transfer types
+  ADVANCE_OUT:'#F59E0B', ADVANCE_RETURN:'#10B981', ADVANCE_EXPENSE:'#EF4444',
 }
 
-const CATEGORY_TABS       = new Set(['SALARY','LABOUR','BANK','DEPOT_EXP','EXPENDITURE','ASHOK_DEPOT','TRUCK','PANKAJ_PLASH','AMAN_PLASH','BROKEN_BUY'])
+const CATEGORY_TABS       = new Set(['SALARY','LABOUR','BANK','EXPENDITURE','ASHOK_DEPOT','TRUCK','PANKAJ_PLASH','AMAN_PLASH','BROKEN_BUY'])
 const INCOME_CATEGORY_TABS = new Set(['BROKEN_SELL', 'HUSK_SELL', 'BRAN_SELL'])
 
 const NAV_MAIN = [
@@ -42,7 +48,6 @@ const NAV_EXPENSE = [
   { key: 'SALARY',       label: 'Salary',       icon: Briefcase    },
   { key: 'LABOUR',       label: 'Labour',       icon: Briefcase    },
   { key: 'BANK',         label: 'Bank',         icon: Building2    },
-  { key: 'DEPOT_EXP',    label: 'Depot',        icon: Package      },
   { key: 'EXPENDITURE',  label: 'Expense',      icon: Receipt      },
   { key: 'ASHOK_DEPOT',  label: 'Ashok',        icon: ShoppingBag  },
   { key: 'TRUCK',        label: 'Truck',        icon: TruckIcon    },
@@ -52,6 +57,10 @@ const NAV_EXPENSE = [
   { key: 'BROKEN_SELL',  label: 'Broken Sell',  icon: TrendingUp   },
   { key: 'HUSK_SELL',    label: 'Husk Sell',    icon: TrendingUp   },
   { key: 'BRAN_SELL',    label: 'Bran Sell',    icon: TrendingUp   },
+]
+const NAV_DEPO = [
+  { key: 'DEPO_ADVANCE', label: 'Add Depo Advance', icon: ArrowUpRight },
+  { key: 'DEPO_SETTLE',  label: 'Depo Settlement',  icon: FileText     },
 ]
 
 function dayLabel(dateStr) {
@@ -104,7 +113,32 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 
       {/* Divider */}
       <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 12px' }} />
-      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: 1, padding: '8px 16px 4px', textTransform: 'uppercase' }}>
+      <p style={{ fontSize: 10, color: 'rgba(255,200,0,0.45)', fontWeight: 700, letterSpacing: 1, padding: '8px 16px 4px', textTransform: 'uppercase' }}>
+        🏭 Depo Management
+      </p>
+
+      {/* Depo nav */}
+      <div className="flex flex-col">
+        {NAV_DEPO.map(item => {
+          const Icon = item.icon
+          const active = activeTab === item.key
+          return (
+            <button key={item.key} onClick={() => onTabChange(item.key)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 transition-all text-left"
+              style={active
+                ? { background: 'rgba(245,158,11,0.15)', borderLeft: '3px solid #F59E0B', color: '#FCD34D' }
+                : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.45)' }
+              }>
+              <Icon size={14} color={active ? '#F59E0B' : 'rgba(255,255,255,0.3)'} />
+              <span style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{item.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 12px 2px' }} />
+      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: 1, padding: '6px 16px 4px', textTransform: 'uppercase' }}>
         Categories
       </p>
 
@@ -360,9 +394,70 @@ function StaffView({ employees, transactions, settings, onEmployeeClick }) {
   )
 }
 
+// ── Depo View ─────────────────────────────────────────────────────────────────
+function DepoView({ mode, transactions, settings }) {
+  const cur = settings.currency || '₹'
+  const depoTxns = transactions
+    .filter(t => t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE || t.type === TRANSACTION_TYPES.ADVANCE_RETURN)
+    .sort((a, b) => b.date.localeCompare(a.date) || new Date(b.createdAt||0) - new Date(a.createdAt||0))
+
+  const TYPE_STYLE = {
+    [TRANSACTION_TYPES.ADVANCE_OUT]:     { label: 'Advance Given',    bg: '#FFFBEB', color: '#D97706', icon: '→' },
+    [TRANSACTION_TYPES.ADVANCE_EXPENSE]: { label: 'Depo Expense',     bg: '#FFF1F2', color: '#E11D48', icon: '↓' },
+    [TRANSACTION_TYPES.ADVANCE_RETURN]:  { label: 'Returned to Main', bg: '#ECFDF5', color: '#059669', icon: '←' },
+  }
+
+  return (
+    <div>
+      <DepoExpenseForm mode={mode} />
+      <div style={{ padding: '0 12px 32px' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, paddingLeft: 2 }}>
+          Depo Transaction History
+        </p>
+        {depoTxns.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: '#9CA3AF', fontSize: 13 }}>
+            No depo transactions yet
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {depoTxns.map(t => {
+              const s = TYPE_STYLE[t.type] || {}
+              const catColor = CAT_COLOR[t.category] || CAT_COLOR[t.type] || '#94A3B8'
+              return (
+                <div key={t.id}
+                  className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5"
+                  style={{ borderColor: '#F1F5F9' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: s.color, fontWeight: 700, fontSize: 16 }}>
+                    {s.icon}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontWeight: 600, color: '#111827', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</p>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${s.color}18`, color: s.color }}>{s.label}</span>
+                      {t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
+                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category)}</span>
+                      )}
+                      <span style={{ fontSize: 9, color: '#9CA3AF' }}>{t.date}</span>
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, color: s.color, textAlign: 'right' }}>
+                      {t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '-'}{formatCurrency(t.amount, cur)}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 function MainApp() {
-  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction } = useApp()
+  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction, getMunimBalance } = useApp()
 
   const [tab, setTab]               = useState('ALL')
   const [search, setSearch]         = useState('')
@@ -387,8 +482,10 @@ function MainApp() {
 
   const cashInHand = useMemo(() =>
     transactions.reduce((sum, t) => {
-      if ((t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT) && isCashTxn(t)) return sum + t.amount
-      if ((t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) && isCashTxn(t)) return sum - t.amount
+      if (!isCashTxn(t)) return sum
+      if (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN) return sum + t.amount
+      if (t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL || t.type === TRANSACTION_TYPES.ADVANCE_OUT) return sum - t.amount
+      // ADVANCE_EXPENSE does not touch Main Cash (deducted from Munim account)
       return sum
     }, 0),
     [transactions]
@@ -405,8 +502,8 @@ function MainApp() {
     const today = new Date().toISOString().slice(0, 10)
     const t2 = transactions.filter(t => t.date === today)
     return {
-      todayIn:  t2.filter(t => (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
-      todayOut: t2.filter(t => (t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      todayIn:  t2.filter(t => (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
+      todayOut: t2.filter(t => (t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL || t.type === TRANSACTION_TYPES.ADVANCE_OUT) && isCashTxn(t)).reduce((s, t) => s + t.amount, 0),
     }
   }, [transactions])
 
@@ -547,7 +644,8 @@ function MainApp() {
     win.document.close(); win.focus(); setTimeout(() => win.print(), 300)
   }
 
-  const activeLabel = [...NAV_MAIN, ...NAV_EXPENSE].find(n => n.key === tab)?.label
+  const isDepoTab   = tab === 'DEPO_ADVANCE' || tab === 'DEPO_SETTLE'
+  const activeLabel = [...NAV_MAIN, ...NAV_EXPENSE, ...NAV_DEPO].find(n => n.key === tab)?.label
 
   return (
     <div className="min-h-screen" style={{ background: '#F1F5F9' }}>
@@ -588,7 +686,7 @@ function MainApp() {
           {/* Mobile-only horizontal tab scroll */}
           <div className="flex md:hidden overflow-x-auto gap-1.5 px-3 pb-2 scrollbar-none"
             style={{ scrollbarWidth: 'none' }}>
-            {[...NAV_MAIN, ...NAV_EXPENSE].map(item => {
+            {[...NAV_MAIN, ...NAV_EXPENSE, ...NAV_DEPO].map(item => {
               const active = tab === item.key
               const color = CAT_COLOR[item.key] || '#818CF8'
               return (
@@ -605,8 +703,11 @@ function MainApp() {
           </div>
         </div>
 
+        {/* ── DEPO VIEW ─────────────────────────────────────────────────── */}
+        {isDepoTab && <DepoView mode={tab === 'DEPO_ADVANCE' ? 'advance' : 'settle'} transactions={transactions} settings={settings} />}
+
         {/* ── CASH IN HAND BANNER ───────────────────────────────────────── */}
-        {tab !== 'STAFF' && (
+        {tab !== 'STAFF' && !isDepoTab && (
           <div className="mx-3 mt-3 rounded-lg px-3 py-2.5 flex items-center justify-between"
             style={{ background: '#1B5C20' }}>
             <div>
@@ -625,7 +726,7 @@ function MainApp() {
         )}
 
         {/* ── ENTRY FORMS (tab-switch on mobile, side-by-side on desktop) ── */}
-        {tab !== 'STAFF' && (
+        {tab !== 'STAFF' && !isDepoTab && (
           <div className="mx-3 mt-2 mb-3">
             {/* Mobile form tab switcher */}
             <div className="flex md:hidden gap-1.5 mb-2">
@@ -666,7 +767,7 @@ function MainApp() {
         )}
 
         {/* ── SEARCH + DATE FILTER + PDF/PRINT ─────────────────────────── */}
-        {tab !== 'STAFF' && (<><div className="px-3 pt-2 pb-1">
+        {tab !== 'STAFF' && !isDepoTab && (<><div className="px-3 pt-2 pb-1">
           {/* Section label */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded" style={{ background: CAT_COLOR[tab] || '#1B5C20' }} />
@@ -817,10 +918,11 @@ function MainApp() {
 
               <div className="space-y-1.5">
                 {txns.map(t => {
-                  const inflow   = isInflow(t.type)
+                  const inflow   = isInflow(t.type) || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
+                  const isTransfer = t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
                   const partner  = t.ownerId   ? owners.find(o => o.id === t.ownerId)
                                  : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
-                  const catColor = CAT_COLOR[t.category] || (inflow ? '#10B981' : '#F43F5E')
+                  const catColor = CAT_COLOR[t.category] || CAT_COLOR[t.type] || (inflow ? '#10B981' : '#F43F5E')
                   return (
                     <div key={t.id}
                       onClick={selectMode ? () => setSelectedIds(prev => {
@@ -850,10 +952,22 @@ function MainApp() {
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 truncate text-xs">{t.description}</p>
                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                          {t.category && (
+                          {isTransfer && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{ background: '#FEF3C7', color: '#92400E', fontSize: 9 }}>
+                              🏭 Depo Transfer
+                            </span>
+                          )}
+                          {t.category && !isTransfer && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: `${catColor}18`, color: catColor, fontSize: 9 }}>
                               {getCategoryLabel(t.category)}
+                            </span>
+                          )}
+                          {t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{ background: '#FEE2E2', color: '#DC2626', fontSize: 9 }}>
+                              🏭 {getCategoryLabel(t.category)}
                             </span>
                           )}
                           {t.paymentMode && (

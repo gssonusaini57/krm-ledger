@@ -6,7 +6,6 @@ const CATEGORY_CHIPS = [
   { value: 'SALARY',       label: 'Salary'     },
   { value: 'LABOUR',       label: 'Labour'     },
   { value: 'BANK',         label: 'Bank'       },
-  { value: 'DEPOT_EXP',    label: 'Depot'      },
   { value: 'EXPENDITURE',  label: 'Expense'    },
   { value: 'ASHOK_DEPOT',  label: 'Ashok'      },
   { value: 'TRUCK',        label: 'Truck'      },

@@ -5,6 +5,9 @@ export const TRANSACTION_TYPES = {
   EXPENSE: 'EXPENSE',
   OWNER_DEPOSIT: 'OWNER_DEPOSIT',
   OWNER_WITHDRAWAL: 'OWNER_WITHDRAWAL',
+  ADVANCE_OUT: 'ADVANCE_OUT',       // Main Cash → Munim (Stage 1)
+  ADVANCE_EXPENSE: 'ADVANCE_EXPENSE', // Munim account → Depo expense (Stage 2)
+  ADVANCE_RETURN: 'ADVANCE_RETURN',   // Munim → Main Cash (Stage 3)
 }
 
 export const TYPE_LABELS = {
@@ -12,6 +15,9 @@ export const TYPE_LABELS = {
   EXPENSE: 'Expense',
   OWNER_DEPOSIT: 'Owner Deposit',
   OWNER_WITHDRAWAL: 'Owner Withdrawal',
+  ADVANCE_OUT: 'Advance Given',
+  ADVANCE_EXPENSE: 'Depo Expense',
+  ADVANCE_RETURN: 'Advance Returned',
 }
 
 export const INCOME_CATEGORIES = [
@@ -48,6 +54,15 @@ export const EXPENSE_CATEGORIES = [
   { value: 'BANK_CHARGES',     label: 'Bank / Interest Charges' },
   { value: 'TAX_GOVT',         label: 'Tax / Govt Fees' },
   { value: 'MISCELLANEOUS',    label: 'Miscellaneous' },
+]
+
+export const DEPO_EXPENSE_CATEGORIES = [
+  { value: 'DEPO_LOADING',   label: 'Loading' },
+  { value: 'DEPO_TRANSPORT', label: 'Transport / Freight' },
+  { value: 'DEPO_TOLL',      label: 'Toll Charges' },
+  { value: 'DEPO_LABOUR',    label: 'Labour' },
+  { value: 'DEPO_TEA',       label: 'Tea / Food' },
+  { value: 'DEPO_MISC',      label: 'Miscellaneous' },
 ]
 
 export const PAYMENT_MODES = [
@@ -162,8 +177,14 @@ export function getLast12Months() {
   return months
 }
 
+const ADVANCE_CAT_LABELS = {
+  ADVANCE_OUT:    'Advance Given',
+  ADVANCE_RETURN: 'Advance Returned',
+}
+
 export function getCategoryLabel(catValue) {
-  const all = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES]
+  if (ADVANCE_CAT_LABELS[catValue]) return ADVANCE_CAT_LABELS[catValue]
+  const all = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES, ...DEPO_EXPENSE_CATEGORIES]
   return all.find(c => c.value === catValue)?.label || catValue
 }
 

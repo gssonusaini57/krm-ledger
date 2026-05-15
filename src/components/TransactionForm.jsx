@@ -142,7 +142,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
               <select value={category} onChange={e => setCategory(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all">
                 <option value="">Select category...</option>
-                {(tab === 'IN' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
+                {(tab === 'IN' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES.filter(c => c.value !== 'DEPOT_EXP')).map(c => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>

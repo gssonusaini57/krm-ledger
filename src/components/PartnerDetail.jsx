@@ -8,11 +8,11 @@ function dayLabel(dateStr) {
   const d = new Date(dateStr)
   if (isToday(d))     return 'Today'
   if (isYesterday(d)) return 'Yesterday'
-  return format(d, 'dd MMMM yyyy')
+  return format(d, 'dd/MM/yyyy')
 }
 
 export default function PartnerDetail({ partner, onClose }) {
-  const { transactions, settings } = useApp()
+  const { transactions, settings, customCategories = [] } = useApp()
 
   // All transactions belonging to this partner.
   // EXPENSE entries linked via partnerId are excluded — those are mill expenses
@@ -153,7 +153,7 @@ export default function PartnerDetail({ partner, onClose }) {
                               {typeLabel}
                             </span>
                             {t.category && (
-                              <span className="text-xs text-gray-400">{getCategoryLabel(t.category)}</span>
+                              <span className="text-xs text-gray-400">{getCategoryLabel(t.category, customCategories)}</span>
                             )}
                           </div>
                         </div>

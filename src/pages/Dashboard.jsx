@@ -54,7 +54,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">{settings.companyName}</h1>
-          <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <p className="text-sm text-gray-500">{formatDate(new Date().toISOString().slice(0, 10))}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}

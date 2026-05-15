@@ -22,7 +22,7 @@ function SummaryCard({ label, value, color }) {
 }
 
 export default function Reports() {
-  const { transactions, owners, settings, getTotals } = useApp()
+  const { transactions, owners, settings, getTotals, customCategories = [] } = useApp()
 
   const last12 = getLast12Months()
 
@@ -46,10 +46,10 @@ export default function Reports() {
       map[key] = (map[key] || 0) + t.amount
     })
     return Object.entries(map)
-      .map(([key, value]) => ({ name: getCategoryLabel(key), value }))
+      .map(([key, value]) => ({ name: getCategoryLabel(key, customCategories), value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8)
-  }, [transactions])
+  }, [transactions, customCategories])
 
   const ownerData = useMemo(() => {
     return owners.map((owner, i) => {
@@ -73,9 +73,9 @@ export default function Reports() {
       map[key] = (map[key] || 0) + t.amount
     })
     return Object.entries(map)
-      .map(([key, value]) => ({ name: getCategoryLabel(key), value }))
+      .map(([key, value]) => ({ name: getCategoryLabel(key, customCategories), value }))
       .sort((a, b) => b.value - a.value)
-  }, [transactions])
+  }, [transactions, customCategories])
 
   const formatYAxis = (val) => {
     if (val >= 100000) return `${(val / 100000).toFixed(1)}L`

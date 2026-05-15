@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
+import DateInput from './DateInput'
+import CategoryModal from './CategoryModal'
 
 const MODES = [
   { key: 'IN',    label: '💰 Credit'   },
@@ -10,7 +12,7 @@ const MODES = [
 ]
 
 export default function TransactionForm({ onClose, editData = null, defaultTab = 'IN', defaultCategory = '' }) {
-  const { owners, employees = [], addTransaction, updateTransaction } = useApp()
+  const { owners, employees = [], addTransaction, updateTransaction, customCategories = [] } = useApp()
 
   const [tab, setTab]             = useState(defaultTab === 'OWNER' ? 'OWNER' : defaultTab === 'OUT' ? 'OUT' : 'IN')
   const [amount, setAmount]       = useState('')
@@ -23,6 +25,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
   const [partnerId, setPartnerId] = useState('')
   const [date, setDate]           = useState(todayISO())
   const [error, setError]         = useState('')
+  const [showCatModal, setShowCatModal] = useState(false)
 
   useEffect(() => {
     if (!editData) return
@@ -118,8 +121,8 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Date</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all" />
+              <DateInput value={date} onChange={e => setDate(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800" />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Amount (₹)</label>
@@ -139,15 +142,27 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
           {(tab === 'IN' || tab === 'OUT') && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Category</label>
-              <select value={category} onChange={e => setCategory(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all">
+              <select
+                value={category}
+                onChange={e => {
+                  if (e.target.value === '__NEW__') { setShowCatModal(true); return }
+                  setCategory(e.target.value)
+                }}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
+              >
                 <option value="">Select category...</option>
-                {(tab === 'IN' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES.filter(c => c.value !== 'DEPOT_EXP')).map(c => (
+                {(tab === 'IN'
+                  ? [...INCOME_CATEGORIES, ...customCategories.filter(c => c.type === 'INCOME')]
+                  : [...EXPENSE_CATEGORIES.filter(c => c.value !== 'DEPOT_EXP'), ...customCategories.filter(c => c.type === 'EXPENSE')]
+                ).map(c => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
+                <option value="__NEW__">+ Create New Category…</option>
               </select>
             </div>
           )}
+
+          {showCatModal && <CategoryModal onClose={() => setShowCatModal(false)} />}
 
           {/* Link to Partner — optional for Credit/Debit */}
           {(tab === 'IN' || tab === 'OUT') && (

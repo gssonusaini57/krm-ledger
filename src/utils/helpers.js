@@ -86,7 +86,7 @@ export function formatCurrency(amount, currency = '₹') {
 
 export function formatDate(dateStr) {
   try {
-    return format(new Date(dateStr), 'dd MMM yyyy')
+    return format(new Date(dateStr), 'dd/MM/yyyy')
   } catch {
     return dateStr
   }
@@ -94,7 +94,7 @@ export function formatDate(dateStr) {
 
 export function formatDateShort(dateStr) {
   try {
-    return format(new Date(dateStr), 'dd/MM/yy')
+    return format(new Date(dateStr), 'dd/MM/yyyy')
   } catch {
     return dateStr
   }
@@ -182,8 +182,10 @@ const ADVANCE_CAT_LABELS = {
   ADVANCE_RETURN: 'Advance Returned',
 }
 
-export function getCategoryLabel(catValue) {
+export function getCategoryLabel(catValue, customCategories = []) {
   if (ADVANCE_CAT_LABELS[catValue]) return ADVANCE_CAT_LABELS[catValue]
+  const custom = customCategories.find(c => c.value === catValue)
+  if (custom) return custom.label
   const all = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES, ...DEPO_EXPENSE_CATEGORIES]
   return all.find(c => c.value === catValue)?.label || catValue
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, todayISO } from '../utils/helpers'
+import DateInput from './DateInput'
 
 const MODES = [
   { value: 'P_TO_RM',      label: 'P → Mill (Expense)',        hint: 'Partner funds a mill expense' },
@@ -234,8 +235,8 @@ export default function AdvancePaymentForm() {
 
         {/* Date + Amount */}
         <div className="flex gap-1.5">
-          <input type="date" value={date} onChange={e => setDate(e.target.value)}
-            className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-200" />
+          <DateInput value={date} onChange={e => setDate(e.target.value)}
+            className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700" />
           <input type="number" min="1" placeholder="₹ Amount"
             value={amount} onChange={e => setAmount(e.target.value)}
             className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-base font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-200" />

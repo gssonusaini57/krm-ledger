@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Plus, Search, Printer, Pencil, Trash2, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import TransactionForm from '../components/TransactionForm'
+import DateInput from '../components/DateInput'
 import {
   formatCurrency, formatDate, isInflow, computeRunningBalance,
   TRANSACTION_TYPES, TYPE_LABELS, getCategoryLabel, getPaymentModeLabel
@@ -16,7 +17,7 @@ const TYPE_OPTIONS = [
 ]
 
 export default function CashLedger() {
-  const { transactions, owners, settings, deleteTransaction, getTotals } = useApp()
+  const { transactions, owners, settings, deleteTransaction, getTotals, customCategories = [] } = useApp()
   const [showForm, setShowForm] = useState(false)
   const [editData, setEditData] = useState(null)
   const [search, setSearch] = useState('')
@@ -37,7 +38,7 @@ export default function CashLedger() {
           t.description?.toLowerCase().includes(q) ||
           t.reference?.toLowerCase().includes(q) ||
           t.notes?.toLowerCase().includes(q) ||
-          getCategoryLabel(t.category)?.toLowerCase().includes(q)
+          getCategoryLabel(t.category, customCategories)?.toLowerCase().includes(q)
         )
       }
       return true
@@ -103,19 +104,15 @@ export default function CashLedger() {
           >
             {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <input
-            type="date"
+          <DateInput
             value={filterFrom}
             onChange={e => setFilterFrom(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="From date"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="date"
+          <DateInput
             value={filterTo}
             onChange={e => setFilterTo(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="To date"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -174,7 +171,7 @@ export default function CashLedger() {
                         <td className="px-4 py-3">
                           <p className="text-gray-900 font-medium truncate max-w-[220px]">{t.description}</p>
                           {t.category && (
-                            <p className="text-xs text-gray-400">{getCategoryLabel(t.category)}</p>
+                            <p className="text-xs text-gray-400">{getCategoryLabel(t.category, customCategories)}</p>
                           )}
                         </td>
                         <td className="px-4 py-3">

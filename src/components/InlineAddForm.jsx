@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, todayISO } from '../utils/helpers'
+import DateInput from './DateInput'
+import CategoryModal from './CategoryModal'
 
 const CATEGORY_CHIPS = [
   { value: 'SALARY',       label: 'Salary'     },
@@ -17,8 +19,6 @@ const CATEGORY_CHIPS = [
   { value: 'BRAN_SELL',    label: 'Bran Sell'   },
 ]
 
-const CAT_VALUES = new Set(CATEGORY_CHIPS.map(c => c.value))
-
 function getShortcut(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length >= 2) return parts.map(p => p[0]).join('').toLowerCase()
@@ -26,32 +26,40 @@ function getShortcut(name) {
 }
 
 export default function InlineAddForm({ defaultCategory = '', currentTab = '' }) {
-  const { employees = [], addTransaction } = useApp()
+  const { employees = [], addTransaction, customCategories = [] } = useApp()
 
   const fixedEmps    = employees.filter(e => e.type === 'FIXED')
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
   const allEmps      = [...fixedEmps, ...variableEmps]
 
-  const initSelected = () => {
-    const s = new Set()
-    if (defaultCategory && CAT_VALUES.has(defaultCategory)) s.add(defaultCategory)
-    else if (CAT_VALUES.has(currentTab)) s.add(currentTab)
-    return s
-  }
+  const allChips = useMemo(() => [
+    ...CATEGORY_CHIPS,
+    ...customCategories.map(c => ({ value: c.value, label: c.label })),
+  ], [customCategories])
 
-  const [date, setDate]           = useState(todayISO())
-  const [amount, setAmount]       = useState('')
-  const [description, setDesc]    = useState('')
-  const [payMode, setPayMode]     = useState('CASH')
-  const [selected, setSelected]   = useState(initSelected)
-  const [employeeId, setEmpId]    = useState('')
-  const [error, setError]         = useState('')
-  const [success, setSuccess]     = useState(false)
+  const [date, setDate]             = useState(todayISO())
+  const [amount, setAmount]         = useState('')
+  const [description, setDesc]      = useState('')
+  const [payMode, setPayMode]       = useState('CASH')
+  const [selected, setSelected]     = useState(() => {
+    const s = new Set()
+    if (defaultCategory) s.add(defaultCategory)
+    else if (currentTab) s.add(currentTab)
+    return s
+  })
+  const [employeeId, setEmpId]      = useState('')
+  const [error, setError]           = useState('')
+  const [success, setSuccess]       = useState(false)
   const [lastAction, setLastAction] = useState('')
+  const [showCatModal, setShowCatModal] = useState(false)
 
   const reset = () => {
     setAmount(''); setDesc(''); setError(''); setEmpId('')
-    setPayMode('CASH'); setDate(todayISO()); setSelected(initSelected())
+    setPayMode('CASH'); setDate(todayISO())
+    const s = new Set()
+    if (defaultCategory) s.add(defaultCategory)
+    else if (currentTab) s.add(currentTab)
+    setSelected(s)
   }
 
   const toggleCat = (val) =>
@@ -141,8 +149,8 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
 
           {/* Date + Amount */}
           <div className="flex gap-1.5">
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-200" />
+            <DateInput value={date} onChange={e => setDate(e.target.value)}
+              className="w-28 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-xs text-gray-700" />
             <input type="number" min="1" placeholder="₹ Amount"
               value={amount} onChange={e => setAmount(e.target.value)}
               className="flex-1 bg-gray-50 border border-gray-200 rounded px-2 py-2 text-base font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-200" />
@@ -156,7 +164,7 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
 
           {/* Category chips */}
           <div className="flex flex-wrap gap-1">
-            {CATEGORY_CHIPS.map(c => {
+            {allChips.map(c => {
               const active = selected.has(c.value)
               return (
                 <button key={c.value} type="button" onClick={() => toggleCat(c.value)}
@@ -168,7 +176,14 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
                 </button>
               )
             })}
+            <button type="button" onClick={() => setShowCatModal(true)}
+              className="px-2 py-0.5 rounded text-xs font-semibold border-2 transition-all"
+              style={{ borderColor: '#6366F1', background: '#fff', color: '#6366F1', borderStyle: 'dashed' }}>
+              + New
+            </button>
           </div>
+
+          {showCatModal && <CategoryModal onClose={() => setShowCatModal(false)} />}
 
           {/* Employee quick-pick */}
           {hasSalaryLabour && (() => {

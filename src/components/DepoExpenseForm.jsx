@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { formatCurrency, todayISO, TRANSACTION_TYPES, DEPO_EXPENSE_CATEGORIES } from '../utils/helpers'
 import { Plus, Trash2 } from 'lucide-react'
+import DateInput from './DateInput'
 
 export default function DepoExpenseForm({ mode = 'advance' }) {
   const { addTransaction, getMunimBalance, settings } = useApp()
@@ -165,8 +166,8 @@ export default function DepoExpenseForm({ mode = 'advance' }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, display: 'block', marginBottom: 4 }}>Date</label>
-              <input type="date" value={advDate} onChange={e => setAdvDate(e.target.value)} required
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
+              <DateInput value={advDate} onChange={e => setAdvDate(e.target.value)} required
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#F9FAFB' }} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, display: 'block', marginBottom: 4 }}>Amount ({cur})</label>
@@ -208,8 +209,8 @@ export default function DepoExpenseForm({ mode = 'advance' }) {
 
           <div>
             <label style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, display: 'block', marginBottom: 4 }}>Date</label>
-            <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} required
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
+            <DateInput value={expDate} onChange={e => setExpDate(e.target.value)} required
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#F9FAFB' }} />
           </div>
 
           {/* Header row */}
@@ -300,8 +301,8 @@ export default function DepoExpenseForm({ mode = 'advance' }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
               <label style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, display: 'block', marginBottom: 4 }}>Date</label>
-              <input type="date" value={retDate} onChange={e => setRetDate(e.target.value)} required
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
+              <DateInput value={retDate} onChange={e => setRetDate(e.target.value)} required
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#F9FAFB' }} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, display: 'block', marginBottom: 4 }}>Return Amount ({cur})</label>

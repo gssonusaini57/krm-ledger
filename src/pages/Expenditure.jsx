@@ -3,6 +3,7 @@ import { Plus, Receipt } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useApp } from '../context/AppContext'
 import TransactionForm from '../components/TransactionForm'
+import DateInput from '../components/DateInput'
 import {
   formatCurrency, formatDate, TRANSACTION_TYPES, EXPENSE_CATEGORIES, getCategoryLabel
 } from '../utils/helpers'
@@ -10,7 +11,7 @@ import {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16', '#06B6D4']
 
 export default function Expenditure() {
-  const { transactions, settings } = useApp()
+  const { transactions, settings, customCategories = [] } = useApp()
   const [showForm, setShowForm] = useState(false)
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
@@ -35,7 +36,7 @@ export default function Expenditure() {
       map[key] = (map[key] || 0) + t.amount
     })
     return Object.entries(map)
-      .map(([key, value]) => ({ name: getCategoryLabel(key), value, key }))
+      .map(([key, value]) => ({ name: getCategoryLabel(key, customCategories), value, key }))
       .sort((a, b) => b.value - a.value)
   }, [expenses])
 
@@ -72,17 +73,15 @@ export default function Expenditure() {
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
-          <input
-            type="date"
+          <DateInput
             value={filterFrom}
             onChange={e => setFilterFrom(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="date"
+          <DateInput
             value={filterTo}
             onChange={e => setFilterTo(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
         </div>
       </div>
@@ -186,7 +185,7 @@ export default function Expenditure() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
-                        {getCategoryLabel(t.category)}
+                        {getCategoryLabel(t.category, customCategories)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{t.paymentMode}</td>

@@ -7,7 +7,7 @@ import PartnerDetail from './components/PartnerDetail'
 import EmployeeDetail from './components/EmployeeDetail'
 import AdvancePaymentForm from './components/AdvancePaymentForm'
 import {
-  formatCurrency, isInflow, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
+  formatCurrency, formatDate, isInflow, computeRunningBalance, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
@@ -16,6 +16,7 @@ import {
   Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp,
 } from 'lucide-react'
 import DepoExpenseForm from './components/DepoExpenseForm'
+import DateInput from './components/DateInput'
 import { format, isToday, isYesterday } from 'date-fns'
 
 const CAT_COLOR = {
@@ -67,14 +68,14 @@ function dayLabel(dateStr) {
   const d = new Date(dateStr)
   if (isToday(d))     return 'Today'
   if (isYesterday(d)) return 'Yesterday'
-  return format(d, 'dd MMMM yyyy')
+  return format(d, 'dd/MM/yyyy')
 }
 
 const SIDEBAR_W = 200
 const REPORT_W  = 200
 
 // ── Always-visible sidebar ────────────────────────────────────────────────────
-function Sidebar({ activeTab, onTabChange, companyName }) {
+function Sidebar({ activeTab, onTabChange, companyName, navExpense, catColorMap }) {
   return (
     <div
       className="hidden md:flex flex-col fixed left-0 top-0 h-full z-30 overflow-y-auto"
@@ -144,10 +145,10 @@ function Sidebar({ activeTab, onTabChange, companyName }) {
 
       {/* Expense nav */}
       <div className="flex flex-col pb-4">
-        {NAV_EXPENSE.map(item => {
+        {navExpense.map(item => {
           const Icon = item.icon
           const active = activeTab === item.key
-          const color = CAT_COLOR[item.key] || '#94A3B8'
+          const color = catColorMap[item.key] || '#94A3B8'
           return (
             <button key={item.key} onClick={() => onTabChange(item.key)}
               className="flex items-center gap-3 w-full px-4 py-2.5 transition-all text-left"
@@ -396,7 +397,10 @@ function StaffView({ employees, transactions, settings, onEmployeeClick }) {
 
 // ── Depo View ─────────────────────────────────────────────────────────────────
 function DepoView({ mode, transactions, settings }) {
+  const { deleteTransaction, customCategories = [] } = useApp()
   const cur = settings.currency || '₹'
+  const [confirmDel, setConfirmDel] = useState(null)
+
   const depoTxns = transactions
     .filter(t => t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE || t.type === TRANSACTION_TYPES.ADVANCE_RETURN)
     .sort((a, b) => b.date.localeCompare(a.date) || new Date(b.createdAt||0) - new Date(a.createdAt||0))
@@ -435,15 +439,19 @@ function DepoView({ mode, transactions, settings }) {
                     <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${s.color}18`, color: s.color }}>{s.label}</span>
                       {t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
-                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category)}</span>
+                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category, customCategories)}</span>
                       )}
-                      <span style={{ fontSize: 9, color: '#9CA3AF' }}>{t.date}</span>
+                      <span style={{ fontSize: 9, color: '#9CA3AF' }}>{formatDate(t.date)}</span>
                     </div>
                   </div>
-                  <div style={{ flexShrink: 0 }}>
-                    <p style={{ fontWeight: 700, fontSize: 13, color: s.color, textAlign: 'right' }}>
+                  <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, color: s.color }}>
                       {t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '-'}{formatCurrency(t.amount, cur)}
                     </p>
+                    <button onClick={() => setConfirmDel(t)}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+                      <Trash2 size={10} />
+                    </button>
                   </div>
                 </div>
               )
@@ -451,13 +459,38 @@ function DepoView({ mode, transactions, settings }) {
           </div>
         )}
       </div>
+
+      {/* ── Delete Confirm Dialog ── */}
+      {confirmDel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+              <Trash2 size={22} color="#F43F5E" />
+            </div>
+            <p className="font-bold text-gray-900 text-lg mb-1">Delete Entry?</p>
+            <p className="text-gray-500 text-sm mb-1 truncate">{confirmDel.description}</p>
+            <p className="text-gray-400 text-xs mb-5">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDel(null)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
+                Cancel
+              </button>
+              <button onClick={() => { deleteTransaction(confirmDel.id); setConfirmDel(null) }}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                style={{ background: '#F43F5E' }}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 function MainApp() {
-  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction, getMunimBalance } = useApp()
+  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction, getMunimBalance, customCategories = [] } = useApp()
 
   const [tab, setTab]               = useState('ALL')
   const [search, setSearch]         = useState('')
@@ -528,7 +561,7 @@ function MainApp() {
         const isL = (t.partnerId || t.ownerId) && (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.EXPENSE)
         if (!isP && !isL) return false
       }
-      else if (CATEGORY_TABS.has(tab)) {
+      else if (categoryTabsSet.has(tab)) {
         if (tab === 'BANK') {
           // Bank tab: match any transaction paid/received via bank (paymentMode=ONLINE,
           // category=BANK, or linkedCategory=BANK) — covers all 8 partner shortcuts
@@ -539,24 +572,59 @@ function MainApp() {
           if (!byCategory && !byLink) return false
         }
       }
-      else if (INCOME_CATEGORY_TABS.has(tab)) {
+      else if (incomeCategoryTabsSet.has(tab)) {
         const byCategory = t.type === TRANSACTION_TYPES.CASH_IN && t.category === tab
         const byLink = hasLinked(t, tab)
         if (!byCategory && !byLink) return false
       }
       if (search.trim()) {
         const q = search.toLowerCase()
-        return t.description?.toLowerCase().includes(q) || getCategoryLabel(t.category)?.toLowerCase().includes(q)
+        return t.description?.toLowerCase().includes(q) || getCategoryLabel(t.category, customCategories)?.toLowerCase().includes(q)
       }
       return true
     }).sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt))
-  }, [transactions, tab, search, monthFilter, appliedFrom, appliedTo])
+  }, [transactions, tab, search, monthFilter, appliedFrom, appliedTo, categoryTabsSet, incomeCategoryTabsSet, customCategories])
 
   const grouped = useMemo(() => {
     const map = {}
     filtered.forEach(t => { if (!map[t.date]) map[t.date] = []; map[t.date].push(t) })
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
   }, [filtered])
+
+  // Bank statement: running balance over all bank transactions (unfiltered, for the banner)
+  const bankBalance = useMemo(() =>
+    transactions.filter(isBankTxn).reduce((s, t) => s + (isInflow(t.type) ? t.amount : -t.amount), 0),
+    [transactions]
+  )
+  // Bank statement rows: filtered bank transactions with per-row running balance
+  const bankStatement = useMemo(() =>
+    tab === 'BANK' ? computeRunningBalance(filtered) : [],
+    [filtered, tab]
+  )
+
+  // Dynamic category maps/sets that update when custom categories are added
+  const catColorMap = useMemo(() => ({
+    ...CAT_COLOR,
+    ...Object.fromEntries(customCategories.map(c => [c.value, c.color])),
+  }), [customCategories])
+
+  const categoryTabsSet = useMemo(() => new Set([
+    ...CATEGORY_TABS,
+    ...customCategories.filter(c => c.type === 'EXPENSE').map(c => c.value),
+  ]), [customCategories])
+
+  const incomeCategoryTabsSet = useMemo(() => new Set([
+    ...INCOME_CATEGORY_TABS,
+    ...customCategories.filter(c => c.type === 'INCOME').map(c => c.value),
+  ]), [customCategories])
+
+  const navExpense = useMemo(() => [
+    ...NAV_EXPENSE,
+    ...customCategories.filter(c => c.type === 'EXPENSE').map(c => ({ key: c.value, label: c.label, icon: Package })),
+    ...customCategories.filter(c => c.type === 'INCOME').map(c => ({ key: c.value, label: c.label, icon: TrendingUp })),
+  ], [customCategories])
+
+  const getLabel = (cat) => getCategoryLabel(cat, customCategories)
 
   const switchTab = (key) => { setTab(key); setSearch('') }
 
@@ -573,7 +641,7 @@ function MainApp() {
   }
 
   const buildReportHTML = () => {
-    const allNav = [...NAV_MAIN, ...NAV_EXPENSE]
+    const allNav = [...NAV_MAIN, ...navExpense]
     const periodLabel = appliedFrom
       ? `${appliedFrom} to ${appliedTo}`
       : monthFilter
@@ -585,7 +653,7 @@ function MainApp() {
       const partner = t.ownerId ? owners.find(o => o.id === t.ownerId)
                     : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
       const inflow = isInflow(t.type)
-      return `<tr><td>${t.date}</td><td>${t.description||''}</td><td>${getCategoryLabel(t.category)||''}</td><td>${partner?.name||''}</td>
+      return `<tr><td>${formatDate(t.date)}</td><td>${t.description||''}</td><td>${getLabel(t.category)||''}</td><td>${partner?.name||''}</td>
         <td style="color:#10B981;text-align:right">${inflow?'₹'+t.amount.toLocaleString('en-IN'):''}</td>
         <td style="color:#F43F5E;text-align:right">${!inflow?'₹'+t.amount.toLocaleString('en-IN'):''}</td></tr>`
     }).join('')
@@ -594,7 +662,7 @@ function MainApp() {
     .s{display:flex;gap:16px;margin:16px 0}.b{padding:12px 20px;border-radius:8px}
     table{width:100%;border-collapse:collapse}th{background:#1E293B;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase}
     td{padding:7px 8px;border-bottom:1px solid #E2E8F0}tr:nth-child(even) td{background:#F8FAFC}</style></head><body>
-    <h2>${settings.companyName||'KRM Rice Mill'}</h2><p style="color:#64748B;margin:0 0 16px">${periodLabel} — ${format(new Date(),'dd MMM yyyy')}</p>
+    <h2>${settings.companyName||'KRM Rice Mill'}</h2><p style="color:#64748B;margin:0 0 16px">${periodLabel} — ${format(new Date(),'dd/MM/yyyy')}</p>
     <div class="s">
       <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CREDIT</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
       <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">DEBIT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
@@ -623,7 +691,7 @@ function MainApp() {
       const partner = t.ownerId ? owners.find(o => o.id === t.ownerId)
                     : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
       const inf = isInflow(t.type)
-      return `<tr><td>${t.description||''}</td><td>${getCategoryLabel(t.category)||''}</td><td>${partner?.name||''}</td>
+      return `<tr><td>${t.description||''}</td><td>${getLabel(t.category)||''}</td><td>${partner?.name||''}</td>
         <td style="color:#10B981;text-align:right">${inf?'₹'+t.amount.toLocaleString('en-IN'):''}</td>
         <td style="color:#F43F5E;text-align:right">${!inf?'₹'+t.amount.toLocaleString('en-IN'):''}</td></tr>`
     }).join('')
@@ -633,7 +701,7 @@ function MainApp() {
     .s{display:flex;gap:16px;margin:12px 0}.b{padding:10px 16px;border-radius:8px}
     table{width:100%;border-collapse:collapse}th{background:#1E293B;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase}
     td{padding:7px 8px;border-bottom:1px solid #E2E8F0}tr:nth-child(even) td{background:#F8FAFC}</style></head><body>
-    <h2>${settings.companyName||'KRM Rice Mill'} — ${format(new Date(date),'dd MMMM yyyy')}</h2>
+    <h2>${settings.companyName||'KRM Rice Mill'} — ${format(new Date(date),'dd/MM/yyyy')}</h2>
     <div class="s">
       <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:bold">CREDIT</div><div style="font-size:18px;font-weight:bold;color:#10B981">₹${totalIn.toLocaleString('en-IN')}</div></div>
       <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:bold">DEBIT</div><div style="font-size:18px;font-weight:bold;color:#F43F5E">₹${totalOut.toLocaleString('en-IN')}</div></div>
@@ -645,13 +713,13 @@ function MainApp() {
   }
 
   const isDepoTab   = tab === 'DEPO_ADVANCE' || tab === 'DEPO_SETTLE'
-  const activeLabel = [...NAV_MAIN, ...NAV_EXPENSE, ...NAV_DEPO].find(n => n.key === tab)?.label
+  const activeLabel = [...NAV_MAIN, ...navExpense, ...NAV_DEPO].find(n => n.key === tab)?.label
 
   return (
     <div className="min-h-screen" style={{ background: '#F1F5F9' }}>
 
       {/* ── ALWAYS-VISIBLE SIDEBAR ───────────────────────────────────────── */}
-      <Sidebar activeTab={tab} onTabChange={switchTab} companyName={settings.companyName} />
+      <Sidebar activeTab={tab} onTabChange={switchTab} companyName={settings.companyName} navExpense={navExpense} catColorMap={catColorMap} />
 
       {/* ── RIGHT REPORT PANEL ───────────────────────────────────────────── */}
       <ReportPanel
@@ -686,9 +754,9 @@ function MainApp() {
           {/* Mobile-only horizontal tab scroll */}
           <div className="flex md:hidden overflow-x-auto gap-1.5 px-3 pb-2 scrollbar-none"
             style={{ scrollbarWidth: 'none' }}>
-            {[...NAV_MAIN, ...NAV_EXPENSE, ...NAV_DEPO].map(item => {
+            {[...NAV_MAIN, ...navExpense, ...NAV_DEPO].map(item => {
               const active = tab === item.key
-              const color = CAT_COLOR[item.key] || '#818CF8'
+              const color = catColorMap[item.key] || '#818CF8'
               return (
                 <button key={item.key} onClick={() => switchTab(item.key)}
                   className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
@@ -712,15 +780,24 @@ function MainApp() {
             style={{ background: '#1B5C20' }}>
             <div>
               <p className="text-white/60 uppercase tracking-widest font-bold" style={{ fontSize: 10 }}>
-                {monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash in Hand'}
+                {tab === 'BANK' ? 'Bank Balance' : monthFilter ? format(new Date(monthFilter+'-01'), 'MMMM yyyy') : 'Cash in Hand'}
               </p>
               <p className="font-bold text-yellow-400" style={{ fontSize: 22, lineHeight: 1.15 }}>
-                {formatCurrency(cashInHand, settings.currency)}
+                {formatCurrency(tab === 'BANK' ? bankBalance : cashInHand, settings.currency)}
               </p>
             </div>
             <div className="text-right text-white/50 text-xs">
-              <div>Today ↑ <span className="text-emerald-400 font-bold">{formatCurrency(todayIn, settings.currency)}</span></div>
-              <div>Today ↓ <span className="text-rose-400 font-bold">{formatCurrency(todayOut, settings.currency)}</span></div>
+              {tab === 'BANK' ? (
+                <>
+                  <div>Total In ↑ <span className="text-emerald-400 font-bold">{formatCurrency(bankStatement.reduce((s,t)=>isInflow(t.type)?s+t.amount:s,0), settings.currency)}</span></div>
+                  <div>Total Out ↓ <span className="text-rose-400 font-bold">{formatCurrency(bankStatement.reduce((s,t)=>!isInflow(t.type)?s+t.amount:s,0), settings.currency)}</span></div>
+                </>
+              ) : (
+                <>
+                  <div>Today ↑ <span className="text-emerald-400 font-bold">{formatCurrency(todayIn, settings.currency)}</span></div>
+                  <div>Today ↓ <span className="text-rose-400 font-bold">{formatCurrency(todayOut, settings.currency)}</span></div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -745,7 +822,7 @@ function MainApp() {
               <div className={mobileForm === 'simple' ? 'block' : 'hidden md:block'}>
                 <InlineAddForm
                   key={tab}
-                  defaultCategory={CATEGORY_TABS.has(tab) || INCOME_CATEGORY_TABS.has(tab) ? tab : ''}
+                  defaultCategory={categoryTabsSet.has(tab) || incomeCategoryTabsSet.has(tab) ? tab : ''}
                   currentTab={tab}
                 />
               </div>
@@ -770,7 +847,7 @@ function MainApp() {
         {tab !== 'STAFF' && !isDepoTab && (<><div className="px-3 pt-2 pb-1">
           {/* Section label */}
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-1 h-4 rounded" style={{ background: CAT_COLOR[tab] || '#1B5C20' }} />
+            <div className="w-1 h-4 rounded" style={{ background: catColorMap[tab] || '#1B5C20' }} />
             <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">{activeLabel}</span>
             {appliedFrom && (
               <span className="text-xs px-2 py-0.5 rounded font-semibold ml-auto"
@@ -824,11 +901,11 @@ function MainApp() {
 
             {/* Row 2: Date range filter */}
             <div className="flex items-center gap-2 flex-wrap">
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                className="flex-1 md:flex-none bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
+              <DateInput value={fromDate} onChange={e => setFromDate(e.target.value)}
+                className="flex-1 md:flex-none bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700" />
               <span className="text-xs text-gray-400 font-medium">to</span>
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                className="flex-1 md:flex-none bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-300 transition-all" />
+              <DateInput value={toDate} onChange={e => setToDate(e.target.value)}
+                className="flex-1 md:flex-none bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-xs text-gray-700" />
               <button onClick={handleFilterApply}
                 className="px-4 py-1.5 rounded text-xs font-bold text-white transition-all active:scale-95"
                 style={{ background: '#1B5C20' }}>
@@ -887,8 +964,106 @@ function MainApp() {
           </div>
         )}
 
+        {/* ── BANK STATEMENT TABLE ──────────────────────────────────────── */}
+        {tab === 'BANK' && (
+          <div className="px-3 pb-8" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+            {bankStatement.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3">
+                  <span className="text-2xl">🏦</span>
+                </div>
+                <p className="text-gray-500 font-semibold text-sm">No bank transactions found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm bg-white">
+                <table className="w-full border-collapse" style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#1E293B', color: '#fff' }}>
+                      <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap" style={{ fontSize: 11 }}>Date</th>
+                      <th className="px-3 py-2.5 text-left font-semibold" style={{ fontSize: 11 }}>Description</th>
+                      <th className="px-3 py-2.5 text-right font-semibold whitespace-nowrap" style={{ fontSize: 11, color: '#6EE7B7' }}>Credit (+)</th>
+                      <th className="px-3 py-2.5 text-right font-semibold whitespace-nowrap" style={{ fontSize: 11, color: '#FCA5A5' }}>Debit (−)</th>
+                      <th className="px-3 py-2.5 text-right font-semibold whitespace-nowrap" style={{ fontSize: 11, color: '#FCD34D' }}>Balance</th>
+                      <th className="px-3 py-2.5" style={{ fontSize: 11, width: 56 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bankStatement.map((t, idx) => {
+                      const inflow  = isInflow(t.type)
+                      const partner = t.ownerId   ? owners.find(o => o.id === t.ownerId)
+                                    : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
+                      const isEven  = idx % 2 === 0
+                      return (
+                        <tr key={t.id} style={{ background: isEven ? '#fff' : '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+                          <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap" style={{ fontSize: 11 }}>
+                            {formatDate(t.date)}
+                          </td>
+                          <td className="px-3 py-2.5" style={{ maxWidth: 200 }}>
+                            <p className="font-semibold text-gray-900 truncate" style={{ fontSize: 12 }}>{t.description}</p>
+                            {(t.category || partner) && (
+                              <div className="flex gap-1 mt-0.5 flex-wrap">
+                                {t.category && (
+                                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 999, background: `${catColorMap[t.category]||'#94A3B8'}18`, color: catColorMap[t.category]||'#94A3B8' }}>
+                                    {getLabel(t.category)}
+                                  </span>
+                                )}
+                                {partner && (
+                                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 999, background: `${partner.color||'#3B82F6'}15`, color: partner.color||'#3B82F6' }}>
+                                    {partner.name.split(' ')[0]}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap" style={{ color: '#059669', fontSize: 12 }}>
+                            {inflow ? formatCurrency(t.amount, settings.currency) : ''}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap" style={{ color: '#E11D48', fontSize: 12 }}>
+                            {!inflow ? formatCurrency(t.amount, settings.currency) : ''}
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-bold whitespace-nowrap" style={{ color: t.runningBalance >= 0 ? '#1E293B' : '#DC2626', fontSize: 12 }}>
+                            {formatCurrency(t.runningBalance, settings.currency)}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex gap-1 justify-end">
+                              <button onClick={() => { setEditData(t); setShowEditForm(true) }}
+                                className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+                                <Pencil size={10} />
+                              </button>
+                              <button onClick={() => setConfirmDel(t.id)}
+                                className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {/* Closing balance row */}
+                    <tr style={{ background: '#1E293B', color: '#fff' }}>
+                      <td colSpan={2} className="px-3 py-2.5 font-bold" style={{ fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
+                        Closing Balance
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold" style={{ color: '#6EE7B7', fontSize: 12 }}>
+                        {formatCurrency(bankStatement.reduce((s,t)=>isInflow(t.type)?s+t.amount:s,0), settings.currency)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold" style={{ color: '#FCA5A5', fontSize: 12 }}>
+                        {formatCurrency(bankStatement.reduce((s,t)=>!isInflow(t.type)?s+t.amount:s,0), settings.currency)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-bold" style={{ color: '#FCD34D', fontSize: 13 }}>
+                        {bankStatement.length > 0 ? formatCurrency(bankStatement[0].runningBalance, settings.currency) : '—'}
+                      </td>
+                      <td />
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── TRANSACTION LIST ──────────────────────────────────────────── */}
-        <div className="px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        {tab !== 'BANK' && <div className="px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
           {grouped.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3">
@@ -922,7 +1097,7 @@ function MainApp() {
                   const isTransfer = t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
                   const partner  = t.ownerId   ? owners.find(o => o.id === t.ownerId)
                                  : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
-                  const catColor = CAT_COLOR[t.category] || CAT_COLOR[t.type] || (inflow ? '#10B981' : '#F43F5E')
+                  const catColor = catColorMap[t.category] || catColorMap[t.type] || (inflow ? '#10B981' : '#F43F5E')
                   return (
                     <div key={t.id}
                       onClick={selectMode ? () => setSelectedIds(prev => {
@@ -961,13 +1136,13 @@ function MainApp() {
                           {t.category && !isTransfer && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: `${catColor}18`, color: catColor, fontSize: 9 }}>
-                              {getCategoryLabel(t.category)}
+                              {getLabel(t.category)}
                             </span>
                           )}
                           {t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: '#FEE2E2', color: '#DC2626', fontSize: 9 }}>
-                              🏭 {getCategoryLabel(t.category)}
+                              🏭 {getLabel(t.category)}
                             </span>
                           )}
                           {t.paymentMode && (
@@ -1007,7 +1182,7 @@ function MainApp() {
               </div>
             </div>
           ))}
-        </div></>)}
+        </div>}</>)}
 
       </div>
 

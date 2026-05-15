@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { X, ArrowDownRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { formatCurrency } from '../utils/helpers'
+import { formatCurrency, formatDate } from '../utils/helpers'
 import { format } from 'date-fns'
 
 export default function EmployeeDetail({ employee, onClose }) {
@@ -124,7 +124,7 @@ export default function EmployeeDetail({ employee, onClose }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 text-sm truncate">{t.description}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{t.date}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{formatDate(t.date)}</p>
                 </div>
                 <p className="font-bold text-sm text-rose-500 flex-shrink-0">
                   -{formatCurrency(t.amount, settings.currency)}

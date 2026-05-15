@@ -25,6 +25,7 @@ export function AppProvider({ children }) {
   const [settings, setSettings]       = useState(DEFAULT_SETTINGS)
   const [employees, setEmployees]     = useState([])
   const [transactions, setTransactions] = useState([])
+  const [customCategories, setCustomCategories] = useState([])
   const [loading, setLoading]         = useState(true)
 
   // Listen to config (owners, settings, employees)
@@ -40,8 +41,9 @@ export function AppProvider({ children }) {
           setDoc(configRef, { owners: ownersData }, { merge: true })
         }
         setOwners(ownersData)
-        if (data.settings)  setSettings(data.settings)
-        if (data.employees) setEmployees(data.employees)
+        if (data.settings)          setSettings(data.settings)
+        if (data.employees)         setEmployees(data.employees)
+        if (data.customCategories)  setCustomCategories(data.customCategories)
       } else {
         setDoc(configRef, {
           owners: DEFAULT_OWNERS,
@@ -106,6 +108,18 @@ export function AppProvider({ children }) {
     updateConfig({ employees: newEmps })
   }
 
+  const addCustomCategory = (cat) => {
+    const newCats = [...customCategories, cat]
+    setCustomCategories(newCats)
+    updateConfig({ customCategories: newCats })
+  }
+
+  const deleteCustomCategory = (id) => {
+    const newCats = customCategories.filter(c => c.id !== id)
+    setCustomCategories(newCats)
+    updateConfig({ customCategories: newCats })
+  }
+
   const getCompanyBalance = (txns = transactions) => {
     const opening = settings.openingBalance || 0
     return txns.reduce((bal, t) => {
@@ -163,10 +177,11 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      owners, transactions, employees, settings,
+      owners, transactions, employees, settings, customCategories,
       addTransaction, updateTransaction, deleteTransaction,
       updateOwner, updateSettings,
       addEmployee, updateEmployee, deleteEmployee,
+      addCustomCategory, deleteCustomCategory,
       getCompanyBalance, getOwnerBalance, getOwnerTransactions, getTotals, getMunimBalance,
     }}>
       {children}

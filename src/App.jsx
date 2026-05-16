@@ -399,11 +399,13 @@ function StaffView({ employees, transactions, settings, onEmployeeClick }) {
 function DepoView({ mode, transactions, settings }) {
   const { deleteTransaction, customCategories = [] } = useApp()
   const cur = settings.currency || '₹'
-  const [confirmDel, setConfirmDel] = useState(null)
-
-  const depoTxns = transactions
-    .filter(t => t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE || t.type === TRANSACTION_TYPES.ADVANCE_RETURN)
-    .sort((a, b) => b.date.localeCompare(a.date) || new Date(b.createdAt||0) - new Date(a.createdAt||0))
+  const [confirmDel, setConfirmDel]       = useState(null)
+  const [filterFrom, setFilterFrom]       = useState('')
+  const [filterTo, setFilterTo]           = useState('')
+  const [filterType, setFilterType]       = useState('')
+  const [filterSearch, setFilterSearch]   = useState('')
+  const [selectedIds, setSelectedIds]     = useState(new Set())
+  const [confirmBulkDel, setConfirmBulkDel] = useState(false)
 
   const TYPE_STYLE = {
     [TRANSACTION_TYPES.ADVANCE_OUT]:     { label: 'Advance Given',    bg: '#FFFBEB', color: '#D97706', icon: '→' },
@@ -411,56 +413,202 @@ function DepoView({ mode, transactions, settings }) {
     [TRANSACTION_TYPES.ADVANCE_RETURN]:  { label: 'Returned to Main', bg: '#ECFDF5', color: '#059669', icon: '←' },
   }
 
+  const allDepoTxns = transactions
+    .filter(t => t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE || t.type === TRANSACTION_TYPES.ADVANCE_RETURN)
+    .sort((a, b) => b.date.localeCompare(a.date) || new Date(b.createdAt||0) - new Date(a.createdAt||0))
+
+  const depoTxns = allDepoTxns.filter(t => {
+    if (filterFrom && t.date < filterFrom) return false
+    if (filterTo   && t.date > filterTo)   return false
+    if (filterType && t.type !== filterType) return false
+    if (filterSearch) {
+      const q = filterSearch.toLowerCase()
+      if (!t.description?.toLowerCase().includes(q) && !getCategoryLabel(t.category, customCategories)?.toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const allSelected = depoTxns.length > 0 && depoTxns.every(t => selectedIds.has(t.id))
+  const hasFilters  = filterFrom || filterTo || filterType || filterSearch
+
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(depoTxns.map(t => t.id)))
+  }
+
+  const toggleOne = (id) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const handleBulkDelete = () => {
+    selectedIds.forEach(id => deleteTransaction(id))
+    setSelectedIds(new Set())
+    setConfirmBulkDel(false)
+  }
+
+  const handlePrint = () => {
+    const rows = [...depoTxns].reverse().map(t => {
+      const s = TYPE_STYLE[t.type] || {}
+      const catLabel = t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE ? getCategoryLabel(t.category, customCategories) : ''
+      const amtColor = t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '#059669' : t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE ? '#E11D48' : '#D97706'
+      return `<tr>
+        <td>${formatDate(t.date)}</td>
+        <td>${t.description || ''}</td>
+        <td><span style="padding:2px 8px;border-radius:999px;background:${s.color}18;color:${s.color};font-size:10px;font-weight:600">${s.label}</span></td>
+        <td>${catLabel}</td>
+        <td style="text-align:right;color:${amtColor};font-weight:700">${t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '−'}${formatCurrency(t.amount, cur)}</td>
+      </tr>`
+    }).join('')
+    const totAdv = depoTxns.filter(t => t.type === TRANSACTION_TYPES.ADVANCE_OUT).reduce((s, t) => s + t.amount, 0)
+    const totExp = depoTxns.filter(t => t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE).reduce((s, t) => s + t.amount, 0)
+    const totRet = depoTxns.filter(t => t.type === TRANSACTION_TYPES.ADVANCE_RETURN).reduce((s, t) => s + t.amount, 0)
+    const win = window.open('', '_blank')
+    win.document.write(`<!DOCTYPE html><html><head><title>Depo Settlement</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;padding:24px}h2{margin:0 0 4px}
+    .s{display:flex;gap:14px;margin:14px 0;flex-wrap:wrap}.b{padding:10px 18px;border-radius:8px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th{background:#1E293B;color:#fff;padding:8px;text-align:left;font-size:11px;text-transform:uppercase}
+    td{padding:7px 8px;border-bottom:1px solid #E2E8F0}tr:nth-child(even) td{background:#F8FAFC}</style></head><body>
+    <h2>${settings.companyName || 'KRM Rice Mill'} — Depo Settlement Report</h2>
+    <p style="color:#64748B;margin:2px 0 14px">${new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</p>
+    <div class="s">
+      <div class="b" style="background:#FFFBEB"><div style="font-size:10px;color:#D97706;font-weight:700">ADVANCE GIVEN</div><div style="font-size:20px;font-weight:800;color:#F59E0B">${formatCurrency(totAdv, cur)}</div></div>
+      <div class="b" style="background:#FFF1F2"><div style="font-size:10px;color:#E11D48;font-weight:700">DEPO EXPENSES</div><div style="font-size:20px;font-weight:800;color:#F43F5E">${formatCurrency(totExp, cur)}</div></div>
+      <div class="b" style="background:#ECFDF5"><div style="font-size:10px;color:#059669;font-weight:700">CASH RETURNED</div><div style="font-size:20px;font-weight:800;color:#10B981">${formatCurrency(totRet, cur)}</div></div>
+      <div class="b" style="background:#EFF6FF"><div style="font-size:10px;color:#2563EB;font-weight:700">OUTSTANDING</div><div style="font-size:20px;font-weight:800;color:#3B82F6">${formatCurrency(totAdv - totExp - totRet, cur)}</div></div>
+    </div>
+    <table><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>${rows}</tbody></table></body></html>`)
+    win.document.close(); win.focus(); setTimeout(() => win.print(), 300)
+  }
+
   return (
     <div>
       <DepoExpenseForm mode={mode} />
+
+      {/* ── Filter Bar ─────────────────────────────────────────────────────── */}
+      <div style={{ padding: '0 12px 10px' }}>
+        <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" placeholder="Search..." value={filterSearch}
+                onChange={e => setFilterSearch(e.target.value)}
+                className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-300" />
+            </div>
+            <select value={filterType} onChange={e => setFilterType(e.target.value)}
+              className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-300">
+              <option value="">All Types</option>
+              <option value={TRANSACTION_TYPES.ADVANCE_OUT}>Advance Given</option>
+              <option value={TRANSACTION_TYPES.ADVANCE_EXPENSE}>Depo Expense</option>
+              <option value={TRANSACTION_TYPES.ADVANCE_RETURN}>Cash Returned</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <DateInput value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+              className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-gray-50" />
+            <span className="text-xs text-gray-400 font-medium">to</span>
+            <DateInput value={filterTo} onChange={e => setFilterTo(e.target.value)}
+              className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-gray-50" />
+            {hasFilters && (
+              <button onClick={() => { setFilterFrom(''); setFilterTo(''); setFilterType(''); setFilterSearch('') }}
+                className="text-xs font-bold px-2 py-1.5 rounded-lg"
+                style={{ color: '#EF4444', background: '#FFF1F2' }}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Table Toolbar ──────────────────────────────────────────────────── */}
+      <div style={{ padding: '0 12px 8px' }} className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1 }}>
+            Depo History
+          </p>
+          <span style={{ fontSize: 10, color: '#CBD5E1', fontWeight: 600 }}>({depoTxns.length})</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button onClick={() => setConfirmBulkDel(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: '#F43F5E' }}>
+              <Trash2 size={11} /> Delete ({selectedIds.size})
+            </button>
+          )}
+          <button onClick={handlePrint}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+            style={{ background: '#3B82F6' }}>
+            <Printer size={11} /> Print
+          </button>
+        </div>
+      </div>
+
+      {/* ── Transaction List ───────────────────────────────────────────────── */}
       <div style={{ padding: '0 12px 32px' }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, paddingLeft: 2 }}>
-          Depo Transaction History
-        </p>
         {depoTxns.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '32px 0', color: '#9CA3AF', fontSize: 13 }}>
-            No depo transactions yet
+            {hasFilters ? 'No transactions match the filters' : 'No depo transactions yet'}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {depoTxns.map(t => {
-              const s = TYPE_STYLE[t.type] || {}
-              const catColor = CAT_COLOR[t.category] || CAT_COLOR[t.type] || '#94A3B8'
-              return (
-                <div key={t.id}
-                  className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5"
-                  style={{ borderColor: '#F1F5F9' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: s.color, fontWeight: 700, fontSize: 16 }}>
-                    {s.icon}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, color: '#111827', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</p>
-                    <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${s.color}18`, color: s.color }}>{s.label}</span>
-                      {t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
-                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category, customCategories)}</span>
-                      )}
-                      <span style={{ fontSize: 9, color: '#9CA3AF' }}>{formatDate(t.date)}</span>
+          <>
+            {/* Select All row */}
+            <div className="flex items-center gap-2 px-1 pb-2">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                className="w-4 h-4 cursor-pointer accent-rose-500" />
+              <span className="text-xs font-semibold text-gray-400">
+                {allSelected ? 'Deselect All' : 'Select All'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {depoTxns.map(t => {
+                const s = TYPE_STYLE[t.type] || {}
+                const catColor  = CAT_COLOR[t.category] || CAT_COLOR[t.type] || '#94A3B8'
+                const isSelected = selectedIds.has(t.id)
+                return (
+                  <div key={t.id}
+                    className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5"
+                    style={{ borderColor: isSelected ? '#F43F5E' : '#F1F5F9', background: isSelected ? '#FFF8F8' : '#fff', cursor: 'pointer' }}
+                    onClick={() => toggleOne(t.id)}>
+                    <input type="checkbox" checked={isSelected}
+                      onChange={() => toggleOne(t.id)}
+                      onClick={e => e.stopPropagation()}
+                      className="w-4 h-4 flex-shrink-0 cursor-pointer accent-rose-500" />
+                    <div style={{ width: 36, height: 36, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: s.color, fontWeight: 700, fontSize: 16 }}>
+                      {s.icon}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontWeight: 600, color: '#111827', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</p>
+                      <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${s.color}18`, color: s.color }}>{s.label}</span>
+                        {t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
+                          <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category, customCategories)}</span>
+                        )}
+                        <span style={{ fontSize: 9, color: '#9CA3AF' }}>{formatDate(t.date)}</span>
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <p style={{ fontWeight: 700, fontSize: 13, color: s.color }}>
+                        {t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '-'}{formatCurrency(t.amount, cur)}
+                      </p>
+                      <button onClick={e => { e.stopPropagation(); setConfirmDel(t) }}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+                        <Trash2 size={10} />
+                      </button>
                     </div>
                   </div>
-                  <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                    <p style={{ fontWeight: 700, fontSize: 13, color: s.color }}>
-                      {t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '-'}{formatCurrency(t.amount, cur)}
-                    </p>
-                    <button onClick={() => setConfirmDel(t)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
-                      <Trash2 size={10} />
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
 
-      {/* ── Delete Confirm Dialog ── */}
+      {/* ── Single Delete Confirm ───────────────────────────────────────────── */}
       {confirmDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
@@ -472,14 +620,30 @@ function DepoView({ mode, transactions, settings }) {
             <p className="text-gray-400 text-xs mb-5">This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDel(null)}
-                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
-                Cancel
-              </button>
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
               <button onClick={() => { deleteTransaction(confirmDel.id); setConfirmDel(null) }}
                 className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
-                style={{ background: '#F43F5E' }}>
-                Delete
-              </button>
+                style={{ background: '#F43F5E' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Delete Confirm ─────────────────────────────────────────────── */}
+      {confirmBulkDel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+              <Trash2 size={22} color="#F43F5E" />
+            </div>
+            <p className="font-bold text-gray-900 text-lg mb-1">Delete {selectedIds.size} {selectedIds.size === 1 ? 'Entry' : 'Entries'}?</p>
+            <p className="text-gray-400 text-sm mb-5">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmBulkDel(false)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
+              <button onClick={handleBulkDelete}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                style={{ background: '#F43F5E' }}>Delete All</button>
             </div>
           </div>
         </div>
@@ -500,7 +664,6 @@ function MainApp() {
   const [showEditForm, setShowEditForm] = useState(false)
   const [confirmDel, setConfirmDel] = useState(null)
   const [showMobileReport, setShowMobileReport] = useState(false)
-  const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [confirmBulkDel, setConfirmBulkDel] = useState(false)
   const [selectedPartner, setSelectedPartner]   = useState(null)
@@ -549,6 +712,31 @@ function MainApp() {
     }
   }, [transactions, monthFilter])
 
+  // Dynamic category maps/sets that update when custom categories are added
+  // Declared before `filtered` so they are available in its deps array and callback
+  const catColorMap = useMemo(() => ({
+    ...CAT_COLOR,
+    ...Object.fromEntries(customCategories.map(c => [c.value, c.color])),
+  }), [customCategories])
+
+  const categoryTabsSet = useMemo(() => new Set([
+    ...CATEGORY_TABS,
+    ...customCategories.filter(c => c.type === 'EXPENSE').map(c => c.value),
+  ]), [customCategories])
+
+  const incomeCategoryTabsSet = useMemo(() => new Set([
+    ...INCOME_CATEGORY_TABS,
+    ...customCategories.filter(c => c.type === 'INCOME').map(c => c.value),
+  ]), [customCategories])
+
+  const navExpense = useMemo(() => [
+    ...NAV_EXPENSE,
+    ...customCategories.filter(c => c.type === 'EXPENSE').map(c => ({ key: c.value, label: c.label, icon: Package })),
+    ...customCategories.filter(c => c.type === 'INCOME').map(c => ({ key: c.value, label: c.label, icon: TrendingUp })),
+  ], [customCategories])
+
+  const getLabel = (cat) => getCategoryLabel(cat, customCategories)
+
   const filtered = useMemo(() => {
     return transactions.filter(t => {
       if (appliedFrom) {
@@ -563,8 +751,6 @@ function MainApp() {
       }
       else if (categoryTabsSet.has(tab)) {
         if (tab === 'BANK') {
-          // Bank tab: match any transaction paid/received via bank (paymentMode=ONLINE,
-          // category=BANK, or linkedCategory=BANK) — covers all 8 partner shortcuts
           if (!isBankTxn(t)) return false
         } else {
           const byCategory = t.type === TRANSACTION_TYPES.EXPENSE && t.category === tab
@@ -602,31 +788,7 @@ function MainApp() {
     [filtered, tab]
   )
 
-  // Dynamic category maps/sets that update when custom categories are added
-  const catColorMap = useMemo(() => ({
-    ...CAT_COLOR,
-    ...Object.fromEntries(customCategories.map(c => [c.value, c.color])),
-  }), [customCategories])
-
-  const categoryTabsSet = useMemo(() => new Set([
-    ...CATEGORY_TABS,
-    ...customCategories.filter(c => c.type === 'EXPENSE').map(c => c.value),
-  ]), [customCategories])
-
-  const incomeCategoryTabsSet = useMemo(() => new Set([
-    ...INCOME_CATEGORY_TABS,
-    ...customCategories.filter(c => c.type === 'INCOME').map(c => c.value),
-  ]), [customCategories])
-
-  const navExpense = useMemo(() => [
-    ...NAV_EXPENSE,
-    ...customCategories.filter(c => c.type === 'EXPENSE').map(c => ({ key: c.value, label: c.label, icon: Package })),
-    ...customCategories.filter(c => c.type === 'INCOME').map(c => ({ key: c.value, label: c.label, icon: TrendingUp })),
-  ], [customCategories])
-
-  const getLabel = (cat) => getCategoryLabel(cat, customCategories)
-
-  const switchTab = (key) => { setTab(key); setSearch('') }
+  const switchTab = (key) => { setTab(key); setSearch(''); setSelectedIds(new Set()) }
 
   const handleFilterApply = () => {
     setAppliedFrom(fromDate)
@@ -889,13 +1051,6 @@ function MainApp() {
                   style={{ background: '#3B82F6' }}>
                   <Printer size={13} /> Print
                 </button>
-                <button onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()) }}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded text-xs font-bold transition-all"
-                  style={selectMode
-                    ? { background: '#F43F5E', color: '#fff' }
-                    : { background: '#FEE2E2', color: '#DC2626' }}>
-                  {selectMode ? '✕ Cancel' : <><Trash2 size={12} />&nbsp;Select</>}
-                </button>
               </div>
             </div>
 
@@ -1064,6 +1219,32 @@ function MainApp() {
 
         {/* ── TRANSACTION LIST ──────────────────────────────────────────── */}
         {tab !== 'BANK' && <div className="px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+          {grouped.length > 0 && (
+            <div className="flex items-center justify-between py-1.5 px-1 border-b border-gray-200 mb-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-rose-500 cursor-pointer"
+                  checked={filtered.length > 0 && filtered.every(t => selectedIds.has(t.id))}
+                  onChange={() => {
+                    if (filtered.every(t => selectedIds.has(t.id))) setSelectedIds(new Set())
+                    else setSelectedIds(new Set(filtered.map(t => t.id)))
+                  }}
+                />
+                <span className="text-xs font-semibold text-gray-500">Select All</span>
+                {selectedIds.size > 0 && (
+                  <span className="text-xs text-gray-400">({selectedIds.size} selected)</span>
+                )}
+              </label>
+              {selectedIds.size > 0 && (
+                <button onClick={() => setConfirmBulkDel(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white active:scale-95 transition-transform"
+                  style={{ background: '#F43F5E' }}>
+                  <Trash2 size={11} /> Delete Selected ({selectedIds.size})
+                </button>
+              )}
+            </div>
+          )}
           {grouped.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center mb-3">
@@ -1075,6 +1256,21 @@ function MainApp() {
           ) : grouped.map(([date, txns]) => (
             <div key={date}>
               <div className="flex items-center gap-2 mb-1.5">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-rose-500 cursor-pointer flex-shrink-0"
+                  checked={txns.length > 0 && txns.every(t => selectedIds.has(t.id))}
+                  title={`Select all entries for ${dayLabel(date)}`}
+                  onChange={() => {
+                    const allSelected = txns.every(t => selectedIds.has(t.id))
+                    setSelectedIds(prev => {
+                      const next = new Set(prev)
+                      if (allSelected) txns.forEach(t => next.delete(t.id))
+                      else txns.forEach(t => next.add(t.id))
+                      return next
+                    })
+                  }}
+                />
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">{dayLabel(date)}</p>
                 <div className="flex-1 h-px bg-gray-200" />
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -1100,22 +1296,18 @@ function MainApp() {
                   const catColor = catColorMap[t.category] || catColorMap[t.type] || (inflow ? '#10B981' : '#F43F5E')
                   return (
                     <div key={t.id}
-                      onClick={selectMode ? () => setSelectedIds(prev => {
-                        const next = new Set(prev)
-                        next.has(t.id) ? next.delete(t.id) : next.add(t.id)
-                        return next
-                      }) : undefined}
                       className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5 transition-all"
-                      style={{ borderColor: selectMode && selectedIds.has(t.id) ? '#F43F5E' : '#F1F5F9', cursor: selectMode ? 'pointer' : 'default', background: selectMode && selectedIds.has(t.id) ? '#FFF1F2' : '#fff' }}>
-                      {selectMode ? (
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: selectedIds.has(t.id) ? '#F43F5E' : '#F1F5F9' }}>
-                          {selectedIds.has(t.id)
-                            ? <span className="text-white font-bold text-sm">✓</span>
-                            : <span className="text-gray-400 text-sm">○</span>
-                          }
-                        </div>
-                      ) : (
+                      style={{ borderColor: selectedIds.has(t.id) ? '#F43F5E' : '#F1F5F9', background: selectedIds.has(t.id) ? '#FFF8F8' : '#fff' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(t.id)}
+                        onChange={() => setSelectedIds(prev => {
+                          const next = new Set(prev)
+                          next.has(t.id) ? next.delete(t.id) : next.add(t.id)
+                          return next
+                        })}
+                        className="w-4 h-4 flex-shrink-0 accent-rose-500 cursor-pointer"
+                      />
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: inflow ? '#ECFDF5' : '#FFF1F2' }}>
                         {inflow
@@ -1123,7 +1315,6 @@ function MainApp() {
                           : <ArrowDownRight size={16} color="#F43F5E" />
                         }
                       </div>
-                      )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 truncate text-xs">{t.description}</p>
                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
@@ -1163,7 +1354,6 @@ function MainApp() {
                         <p className="font-bold text-sm" style={{ color: inflow ? '#10B981' : '#F43F5E' }}>
                           {inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
                         </p>
-                        {!selectMode && (
                         <div className="flex gap-1 mt-1 justify-end">
                           <button onClick={() => { setEditData(t); setShowEditForm(true) }}
                             className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
@@ -1174,7 +1364,6 @@ function MainApp() {
                             <Trash2 size={10} />
                           </button>
                         </div>
-                        )}
                       </div>
                     </div>
                   )
@@ -1207,18 +1396,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* ── BULK SELECT BAR ──────────────────────────────────────────────── */}
-      {selectMode && selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl"
-          style={{ background: '#1E293B' }}>
-          <span className="text-white text-sm font-semibold">{selectedIds.size} selected</span>
-          <button onClick={() => setConfirmBulkDel(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
-            style={{ background: '#F43F5E' }}>
-            <Trash2 size={14} /> Delete
-          </button>
-        </div>
-      )}
 
       {/* ── BULK DELETE CONFIRM ───────────────────────────────────────────── */}
       {confirmBulkDel && (
@@ -1228,7 +1405,8 @@ function MainApp() {
               <Trash2 size={22} color="#F43F5E" />
             </div>
             <p className="font-bold text-gray-900 text-lg mb-1">Delete {selectedIds.size} {selectedIds.size === 1 ? 'Entry' : 'Entries'}?</p>
-            <p className="text-gray-400 text-sm mb-5">This cannot be undone.</p>
+            <p className="text-gray-500 text-sm mb-1">Are you sure you want to delete all {selectedIds.size} selected {selectedIds.size === 1 ? 'entry' : 'entries'}?</p>
+            <p className="text-gray-400 text-xs mb-5">This action cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmBulkDel(false)}
                 className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
@@ -1236,7 +1414,7 @@ function MainApp() {
               </button>
               <button onClick={() => {
                 selectedIds.forEach(id => deleteTransaction(id))
-                setSelectedIds(new Set()); setSelectMode(false); setConfirmBulkDel(false)
+                setSelectedIds(new Set()); setConfirmBulkDel(false)
               }}
                 className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
                 style={{ background: '#F43F5E' }}>

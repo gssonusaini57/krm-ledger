@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import {
-  collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, deleteField
+  collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { isInflow, TRANSACTION_TYPES } from '../utils/helpers'
@@ -25,7 +25,6 @@ export function AppProvider({ children }) {
   const [settings, setSettings]       = useState(DEFAULT_SETTINGS)
   const [employees, setEmployees]     = useState([])
   const [transactions, setTransactions] = useState([])
-  const [pendingDeletes, setPendingDeletes] = useState([])
   const [customCategories, setCustomCategories] = useState([])
   const [loading, setLoading]         = useState(true)
 
@@ -60,13 +59,8 @@ export function AppProvider({ children }) {
   useEffect(() => {
     const txnsRef = collection(db, 'transactions')
     const unsub = onSnapshot(txnsRef, (snap) => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      setTransactions(all.filter(t => t.status !== 'pending_delete'))
-      setPendingDeletes(
-        all
-          .filter(t => t.status === 'pending_delete')
-          .sort((a, b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''))
-      )
+      const txns = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setTransactions(txns)
       setLoading(false)
     })
     return () => unsub()
@@ -82,19 +76,7 @@ export function AppProvider({ children }) {
     updateDoc(doc(db, 'transactions', id), rest)
 
   const deleteTransaction = (id) =>
-    updateDoc(doc(db, 'transactions', id), {
-      status: 'pending_delete',
-      deletedAt: new Date().toISOString(),
-    })
-
-  const approveDelete = (id) =>
     deleteDoc(doc(db, 'transactions', id))
-
-  const recoverTransaction = (id) =>
-    updateDoc(doc(db, 'transactions', id), {
-      status: 'active',
-      deletedAt: deleteField(),
-    })
 
   const updateOwner = (owner) => {
     const newOwners = owners.map(o => o.id === owner.id ? owner : o)
@@ -195,8 +177,8 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      owners, transactions, pendingDeletes, employees, settings, customCategories,
-      addTransaction, updateTransaction, deleteTransaction, approveDelete, recoverTransaction,
+      owners, transactions, employees, settings, customCategories,
+      addTransaction, updateTransaction, deleteTransaction,
       updateOwner, updateSettings,
       addEmployee, updateEmployee, deleteEmployee,
       addCustomCategory, deleteCustomCategory,

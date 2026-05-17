@@ -7,8 +7,7 @@ import PartnerDetail from './components/PartnerDetail'
 import EmployeeDetail from './components/EmployeeDetail'
 import AdvancePaymentForm from './components/AdvancePaymentForm'
 import {
-  formatCurrency, formatDate, isInflow, computeRunningBalance, TRANSACTION_TYPES, OWNER_COLORS,
-  getCategoryLabel, todayISO, DEPO_EXPENSE_CATEGORIES
+  formatCurrency, formatDate, isInflow, computeRunningBalance, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
@@ -424,92 +423,11 @@ function StaffView({ employees, transactions, settings, onEmployeeClick }) {
   )
 }
 
-// ── Depo Edit Modal ───────────────────────────────────────────────────────────
-function DepoEditModal({ txn, onClose }) {
-  const { requestEdit, settings, customCategories = [] } = useApp()
-  const cur = settings.currency || '₹'
-  const [date, setDate]               = useState(txn.date || '')
-  const [amount, setAmount]           = useState(String(txn.amount || ''))
-  const [description, setDescription] = useState(txn.description || '')
-  const [category, setCategory]       = useState(txn.category || '')
-  const [loading, setLoading]         = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const amt = parseFloat(amount)
-    if (!amt || amt <= 0) return
-    setLoading(true)
-    await requestEdit(txn.id, {
-      date, amount: amt, description,
-      ...(txn.type === TRANSACTION_TYPES.ADVANCE_EXPENSE ? { category } : {}),
-    })
-    setLoading(false)
-    onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-bold text-gray-900">Edit Depo Entry</p>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
-            <XIcon size={15} />
-          </button>
-        </div>
-        <div className="mb-4 px-3 py-2 rounded-xl text-xs font-medium text-amber-700"
-          style={{ background: '#FEF3C7', border: '1px solid #FDE68A' }}>
-          Changes will be sent for Admin approval before taking effect.
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1">Date</label>
-            <DateInput value={date} onChange={e => setDate(e.target.value)} required
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB' }} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1">Amount ({cur})</label>
-            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0.01" step="any"
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
-          </div>
-          {txn.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
-            <div>
-              <label className="text-xs font-semibold text-gray-500 block mb-1">Category</label>
-              <select value={category} onChange={e => setCategory(e.target.value)}
-                style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB', outline: 'none' }}>
-                {DEPO_EXPENSE_CATEGORIES.map(c => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
-              Cancel
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
-              style={{ background: loading ? '#9CA3AF' : '#3B82F6' }}>
-              {loading ? 'Submitting…' : 'Submit for Approval'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ── Depo View ─────────────────────────────────────────────────────────────────
 function DepoView({ mode, transactions, settings }) {
   const { deleteTransaction, customCategories = [] } = useApp()
   const cur = settings.currency || '₹'
   const [confirmDel, setConfirmDel]       = useState(null)
-  const [editTxn, setEditTxn]             = useState(null)
   const [filterFrom, setFilterFrom]       = useState('')
   const [filterTo, setFilterTo]           = useState('')
   const [filterType, setFilterType]       = useState('')
@@ -699,27 +617,16 @@ function DepoView({ mode, transactions, settings }) {
                           <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category, customCategories)}</span>
                         )}
                         <span style={{ fontSize: 9, color: '#9CA3AF' }}>{formatDate(t.date)}</span>
-                        {t.status === 'pending_edit' && (
-                          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: '#FEF3C7', color: '#D97706' }}>✏️ Pending Edit</span>
-                        )}
                       </div>
                     </div>
                     <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                       <p style={{ fontWeight: 700, fontSize: 13, color: s.color }}>
                         {t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '-'}{formatCurrency(t.amount, cur)}
                       </p>
-                      <div className="flex gap-1">
-                        <button onClick={e => { e.stopPropagation(); setEditTxn(t) }}
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-                          title="Request edit">
-                          <Pencil size={10} />
-                        </button>
-                        <button onClick={e => { e.stopPropagation(); setConfirmDel(t) }}
-                          className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                          title="Request delete">
-                          <Trash2 size={10} />
-                        </button>
-                      </div>
+                      <button onClick={e => { e.stopPropagation(); setConfirmDel(t) }}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+                        <Trash2 size={10} />
+                      </button>
                     </div>
                   </div>
                 )
@@ -769,40 +676,38 @@ function DepoView({ mode, transactions, settings }) {
           </div>
         </div>
       )}
-
-      {editTxn && <DepoEditModal txn={editTxn} onClose={() => setEditTxn(null)} />}
     </div>
   )
 }
 
 // ── Delete Approvals View ─────────────────────────────────────────────────────
 function DeleteApprovalsView({ settings }) {
-  const { pendingDeletes, pendingEdits, approveDelete, recoverTransaction, approveEdit, rejectEdit, owners } = useApp()
+  const { pendingDeletes, approveDelete, recoverTransaction, owners, customCategories = [] } = useApp()
   const cur = settings.currency || '₹'
-  const [subTab, setSubTab] = useState('delete') // 'delete' | 'edit'
+  const [selectedIds, setSelectedIds]     = useState(new Set())
+  const [confirmAction, setConfirmAction] = useState(null) // 'approve' | 'recover'
 
-  // ── Delete tab state ──────────────────────────────────────────────────────
-  const [delSelectedIds, setDelSelectedIds] = useState(new Set())
-  const [delConfirmAction, setDelConfirmAction] = useState(null) // 'approve' | 'recover'
+  const allSelected = pendingDeletes.length > 0 && pendingDeletes.every(t => selectedIds.has(t.id))
 
-  const allDelSelected = pendingDeletes.length > 0 && pendingDeletes.every(t => delSelectedIds.has(t.id))
-  const toggleDelAll = () => {
-    if (allDelSelected) setDelSelectedIds(new Set())
-    else setDelSelectedIds(new Set(pendingDeletes.map(t => t.id)))
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(pendingDeletes.map(t => t.id)))
   }
-  const toggleDelOne = (id) => setDelSelectedIds(prev => {
+  const toggleOne = (id) => setSelectedIds(prev => {
     const next = new Set(prev)
     next.has(id) ? next.delete(id) : next.add(id)
     return next
   })
-  const execDelAction = (action) => {
-    const ids = [...delSelectedIds]
+
+  const execAction = (action) => {
+    const ids = [...selectedIds]
     if (action === 'approve') ids.forEach(id => approveDelete(id))
     else ids.forEach(id => recoverTransaction(id))
-    setDelSelectedIds(new Set())
-    setDelConfirmAction(null)
+    setSelectedIds(new Set())
+    setConfirmAction(null)
   }
-  const groupedDeletes = useMemo(() => {
+
+  const grouped = useMemo(() => {
     const map = {}
     pendingDeletes.forEach(t => {
       const key = (t.deletedAt || t.date || '').slice(0, 10)
@@ -812,441 +717,177 @@ function DeleteApprovalsView({ settings }) {
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
   }, [pendingDeletes])
 
-  // ── Edit tab state ────────────────────────────────────────────────────────
-  const [editSelectedIds, setEditSelectedIds] = useState(new Set())
-  const [editConfirmAction, setEditConfirmAction] = useState(null) // 'approve' | 'reject'
-
-  const allEditSelected = pendingEdits.length > 0 && pendingEdits.every(t => editSelectedIds.has(t.id))
-  const toggleEditAll = () => {
-    if (allEditSelected) setEditSelectedIds(new Set())
-    else setEditSelectedIds(new Set(pendingEdits.map(t => t.id)))
+  if (pendingDeletes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+        <div className="w-16 h-16 rounded-3xl bg-green-50 flex items-center justify-center mb-4">
+          <span className="text-3xl">✅</span>
+        </div>
+        <p className="font-bold text-gray-700 text-base">No Pending Deletions</p>
+        <p className="text-gray-400 text-sm mt-1">All clear — nothing awaiting approval.</p>
+      </div>
+    )
   }
-  const toggleEditOne = (id) => setEditSelectedIds(prev => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-  const execEditAction = (action) => {
-    const ids = [...editSelectedIds]
-    if (action === 'approve') {
-      ids.forEach(id => {
-        const txn = pendingEdits.find(t => t.id === id)
-        if (txn?.pendingEdit) approveEdit(id, txn.pendingEdit)
-      })
-    } else {
-      ids.forEach(id => rejectEdit(id))
-    }
-    setEditSelectedIds(new Set())
-    setEditConfirmAction(null)
-  }
-  const groupedEdits = useMemo(() => {
-    const map = {}
-    pendingEdits.forEach(t => {
-      const key = (t.pendingEdit?.requestedAt || t.date || '').slice(0, 10)
-      if (!map[key]) map[key] = []
-      map[key].push(t)
-    })
-    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
-  }, [pendingEdits])
-
-  const EDIT_FIELDS = [
-    { key: 'date',        label: 'Date' },
-    { key: 'amount',      label: 'Amount', format: v => formatCurrency(v, cur) },
-    { key: 'description', label: 'Description' },
-    { key: 'category',    label: 'Category' },
-  ]
 
   return (
     <div className="p-4 space-y-4">
-      {/* Sub-tab switcher */}
-      <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-        <button
-          onClick={() => setSubTab('delete')}
-          className="flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: subTab === 'delete' ? '#EF4444' : 'transparent',
-            color: subTab === 'delete' ? '#fff' : '#6B7280',
-          }}>
-          🗑️ Delete Requests
-          {pendingDeletes.length > 0 && (
-            <span className="rounded-full px-1.5 py-0.5 text-xs font-black"
-              style={{ background: subTab === 'delete' ? 'rgba(255,255,255,0.25)' : '#FEE2E2', color: subTab === 'delete' ? '#fff' : '#EF4444' }}>
-              {pendingDeletes.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setSubTab('edit')}
-          className="flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: subTab === 'edit' ? '#F59E0B' : 'transparent',
-            color: subTab === 'edit' ? '#fff' : '#6B7280',
-          }}>
-          ✏️ Edit Requests
-          {pendingEdits.length > 0 && (
-            <span className="rounded-full px-1.5 py-0.5 text-xs font-black"
-              style={{ background: subTab === 'edit' ? 'rgba(255,255,255,0.25)' : '#FEF3C7', color: subTab === 'edit' ? '#fff' : '#D97706' }}>
-              {pendingEdits.length}
-            </span>
-          )}
-        </button>
+      {/* Summary banner */}
+      <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FFF7ED)', border: '1px solid #FDE68A' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Pending Approval</p>
+            <p className="text-3xl font-black text-amber-800 mt-0.5">{pendingDeletes.length}</p>
+            <p className="text-xs text-amber-600 mt-0.5">entries awaiting review</p>
+          </div>
+          <span className="text-5xl">🗑️</span>
+        </div>
       </div>
 
-      {/* ── DELETE TAB ─────────────────────────────────────────────────────── */}
-      {subTab === 'delete' && (
-        <>
-          {pendingDeletes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-              <div className="w-16 h-16 rounded-3xl bg-green-50 flex items-center justify-center mb-4">
-                <span className="text-3xl">✅</span>
-              </div>
-              <p className="font-bold text-gray-700 text-base">No Pending Deletions</p>
-              <p className="text-gray-400 text-sm mt-1">All clear — nothing awaiting approval.</p>
-            </div>
-          ) : (
-            <>
-              <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FFF7ED)', border: '1px solid #FDE68A' }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Pending Approval</p>
-                    <p className="text-3xl font-black text-amber-800 mt-0.5">{pendingDeletes.length}</p>
-                    <p className="text-xs text-amber-600 mt-0.5">entries awaiting review</p>
-                  </div>
-                  <span className="text-5xl">🗑️</span>
-                </div>
+      {/* Global select + action bar */}
+      <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3 flex-wrap">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll}
+            className="w-4 h-4 accent-rose-500 cursor-pointer" />
+          <span className="text-xs font-semibold text-gray-600">Select All</span>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-gray-400">({selectedIds.size} selected)</span>
+          )}
+        </label>
+        {selectedIds.size > 0 && (
+          <div className="flex gap-2">
+            <button onClick={() => setConfirmAction('recover')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: '#10B981' }}>
+              ↩ Recover ({selectedIds.size})
+            </button>
+            <button onClick={() => setConfirmAction('approve')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: '#EF4444' }}>
+              <Trash2 size={11} /> Delete Forever ({selectedIds.size})
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Grouped list */}
+      <div className="space-y-4">
+        {grouped.map(([date, txns]) => {
+          const today = new Date().toISOString().slice(0, 10)
+          const dateLabel = date === today ? 'Today' : date
+          const allDateSel = txns.every(t => selectedIds.has(t.id))
+          return (
+            <div key={date}>
+              <div className="flex items-center gap-2 mb-2">
+                <input type="checkbox" checked={allDateSel}
+                  className="w-4 h-4 accent-amber-500 cursor-pointer"
+                  onChange={() => {
+                    setSelectedIds(prev => {
+                      const next = new Set(prev)
+                      if (allDateSel) txns.forEach(t => next.delete(t.id))
+                      else txns.forEach(t => next.add(t.id))
+                      return next
+                    })
+                  }}
+                />
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                  Requested: {dateLabel}
+                </p>
+                <div className="flex-1 h-px bg-amber-100" />
+                <span className="text-xs text-amber-500 font-medium">{txns.length} item{txns.length !== 1 ? 's' : ''}</span>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={allDelSelected} onChange={toggleDelAll}
-                    className="w-4 h-4 accent-rose-500 cursor-pointer" />
-                  <span className="text-xs font-semibold text-gray-600">Select All</span>
-                  {delSelectedIds.size > 0 && (
-                    <span className="text-xs text-gray-400">({delSelectedIds.size} selected)</span>
-                  )}
-                </label>
-                {delSelectedIds.size > 0 && (
-                  <div className="flex gap-2">
-                    <button onClick={() => setDelConfirmAction('recover')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-                      style={{ background: '#10B981' }}>
-                      ↩ Recover ({delSelectedIds.size})
-                    </button>
-                    <button onClick={() => setDelConfirmAction('approve')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-                      style={{ background: '#EF4444' }}>
-                      <Trash2 size={11} /> Delete Forever ({delSelectedIds.size})
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                {groupedDeletes.map(([date, txns]) => {
-                  const today = new Date().toISOString().slice(0, 10)
-                  const dateLabel = date === today ? 'Today' : date
-                  const allDateSel = txns.every(t => delSelectedIds.has(t.id))
+              <div className="space-y-2">
+                {txns.map(t => {
+                  const inflow = isInflow(t.type)
+                  const partner = t.ownerId   ? owners.find(o => o.id === t.ownerId)
+                                : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
+                  const isSelected = selectedIds.has(t.id)
                   return (
-                    <div key={date}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input type="checkbox" checked={allDateSel}
-                          className="w-4 h-4 accent-amber-500 cursor-pointer"
-                          onChange={() => {
-                            setDelSelectedIds(prev => {
-                              const next = new Set(prev)
-                              if (allDateSel) txns.forEach(t => next.delete(t.id))
-                              else txns.forEach(t => next.add(t.id))
-                              return next
-                            })
-                          }}
-                        />
-                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                          Requested: {dateLabel}
-                        </p>
-                        <div className="flex-1 h-px bg-amber-100" />
-                        <span className="text-xs text-amber-500 font-medium">{txns.length} item{txns.length !== 1 ? 's' : ''}</span>
+                    <div key={t.id}
+                      className="bg-white rounded-xl px-3 py-2.5 border flex items-center gap-2.5"
+                      style={{ borderColor: isSelected ? '#F59E0B' : '#FEF3C7', background: isSelected ? '#FFFBEB' : '#fff' }}>
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleOne(t.id)}
+                        className="w-4 h-4 flex-shrink-0 accent-amber-500 cursor-pointer" />
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: '#FEF3C7' }}>
+                        <span style={{ fontSize: 16 }}>🗑️</span>
                       </div>
-                      <div className="space-y-2">
-                        {txns.map(t => {
-                          const inflow = isInflow(t.type)
-                          const partner = t.ownerId   ? owners.find(o => o.id === t.ownerId)
-                                        : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
-                          const isSelected = delSelectedIds.has(t.id)
-                          return (
-                            <div key={t.id}
-                              className="bg-white rounded-xl px-3 py-2.5 border flex items-center gap-2.5"
-                              style={{ borderColor: isSelected ? '#F59E0B' : '#FEF3C7', background: isSelected ? '#FFFBEB' : '#fff' }}>
-                              <input type="checkbox" checked={isSelected} onChange={() => toggleDelOne(t.id)}
-                                className="w-4 h-4 flex-shrink-0 accent-amber-500 cursor-pointer" />
-                              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                                style={{ background: '#FEF3C7' }}>
-                                <span style={{ fontSize: 16 }}>🗑️</span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-500 truncate text-xs line-through">{t.description}</p>
-                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                                    style={{ background: inflow ? '#ECFDF5' : '#FFF1F2', color: inflow ? '#059669' : '#E11D48', fontSize: 9 }}>
-                                    {inflow ? 'Credit' : 'Debit'}
-                                  </span>
-                                  <span className="text-gray-400" style={{ fontSize: 9 }}>{t.date}</span>
-                                  {partner && (
-                                    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                                      style={{ background: `${partner.color || '#3B82F6'}15`, color: partner.color || '#3B82F6', fontSize: 9 }}>
-                                      {partner.name.split(' ')[0]}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                                <p className="font-bold text-sm opacity-60" style={{ color: inflow ? '#059669' : '#E11D48' }}>
-                                  {inflow ? '+' : '-'}{formatCurrency(t.amount, cur)}
-                                </p>
-                                <div className="flex gap-1">
-                                  <button onClick={() => recoverTransaction(t.id)}
-                                    className="px-2 py-1 rounded-lg font-bold text-white"
-                                    style={{ background: '#10B981', fontSize: 10 }}>
-                                    ↩ Recover
-                                  </button>
-                                  <button onClick={() => approveDelete(t.id)}
-                                    className="px-2 py-1 rounded-lg font-bold text-white"
-                                    style={{ background: '#EF4444', fontSize: 10 }}>
-                                    ✓ Delete
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-500 truncate text-xs line-through">{t.description}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                            style={{ background: inflow ? '#ECFDF5' : '#FFF1F2', color: inflow ? '#059669' : '#E11D48', fontSize: 9 }}>
+                            {inflow ? 'Credit' : 'Debit'}
+                          </span>
+                          <span className="text-gray-400" style={{ fontSize: 9 }}>{t.date}</span>
+                          {partner && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                              style={{ background: `${partner.color || '#3B82F6'}15`, color: partner.color || '#3B82F6', fontSize: 9 }}>
+                              {partner.name.split(' ')[0]}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
+                        <p className="font-bold text-sm opacity-60" style={{ color: inflow ? '#059669' : '#E11D48' }}>
+                          {inflow ? '+' : '-'}{formatCurrency(t.amount, cur)}
+                        </p>
+                        <div className="flex gap-1">
+                          <button onClick={() => recoverTransaction(t.id)}
+                            className="px-2 py-1 rounded-lg font-bold text-white"
+                            style={{ background: '#10B981', fontSize: 10 }}>
+                            ↩ Recover
+                          </button>
+                          <button onClick={() => approveDelete(t.id)}
+                            className="px-2 py-1 rounded-lg font-bold text-white"
+                            style={{ background: '#EF4444', fontSize: 10 }}>
+                            ✓ Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
                 })}
               </div>
-
-              {delConfirmAction && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
-                  <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-                      style={{ background: delConfirmAction === 'approve' ? '#FEF2F2' : '#ECFDF5' }}>
-                      {delConfirmAction === 'approve'
-                        ? <Trash2 size={22} color="#EF4444" />
-                        : <span className="text-2xl">↩</span>
-                      }
-                    </div>
-                    <p className="font-bold text-gray-900 text-lg mb-1">
-                      {delConfirmAction === 'approve'
-                        ? `Permanently Delete ${delSelectedIds.size} ${delSelectedIds.size === 1 ? 'Entry' : 'Entries'}?`
-                        : `Recover ${delSelectedIds.size} ${delSelectedIds.size === 1 ? 'Entry' : 'Entries'}?`}
-                    </p>
-                    <p className="text-gray-500 text-sm mb-5">
-                      {delConfirmAction === 'approve'
-                        ? 'This will permanently wipe selected entries from the database. This cannot be undone.'
-                        : 'Selected entries will be restored to the active ledger immediately.'}
-                    </p>
-                    <div className="flex gap-3">
-                      <button onClick={() => setDelConfirmAction(null)}
-                        className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
-                        Cancel
-                      </button>
-                      <button onClick={() => execDelAction(delConfirmAction)}
-                        className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
-                        style={{ background: delConfirmAction === 'approve' ? '#EF4444' : '#10B981' }}>
-                        {delConfirmAction === 'approve' ? 'Delete Forever' : 'Restore to Ledger'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── EDIT TAB ───────────────────────────────────────────────────────── */}
-      {subTab === 'edit' && (
-        <>
-          {pendingEdits.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-              <div className="w-16 h-16 rounded-3xl bg-green-50 flex items-center justify-center mb-4">
-                <span className="text-3xl">✅</span>
-              </div>
-              <p className="font-bold text-gray-700 text-base">No Pending Edits</p>
-              <p className="text-gray-400 text-sm mt-1">All clear — no changes awaiting review.</p>
             </div>
-          ) : (
-            <>
-              <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FFFBEB)', border: '1px solid #FDE68A' }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Pending Edit Review</p>
-                    <p className="text-3xl font-black text-amber-800 mt-0.5">{pendingEdits.length}</p>
-                    <p className="text-xs text-amber-600 mt-0.5">edit requests awaiting approval</p>
-                  </div>
-                  <span className="text-5xl">✏️</span>
-                </div>
-              </div>
+          )
+        })}
+      </div>
 
-              {/* Bulk action bar */}
-              <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={allEditSelected} onChange={toggleEditAll}
-                    className="w-4 h-4 accent-amber-500 cursor-pointer" />
-                  <span className="text-xs font-semibold text-gray-600">Select All</span>
-                  {editSelectedIds.size > 0 && (
-                    <span className="text-xs text-gray-400">({editSelectedIds.size} selected)</span>
-                  )}
-                </label>
-                {editSelectedIds.size > 0 && (
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditConfirmAction('reject')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-                      style={{ background: '#6B7280' }}>
-                      ✗ Reject ({editSelectedIds.size})
-                    </button>
-                    <button onClick={() => setEditConfirmAction('approve')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-white"
-                      style={{ background: '#10B981' }}>
-                      ✓ Approve ({editSelectedIds.size})
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Grouped edit cards */}
-              <div className="space-y-4">
-                {groupedEdits.map(([date, txns]) => {
-                  const today = new Date().toISOString().slice(0, 10)
-                  const dateLabel = date === today ? 'Today' : date
-                  return (
-                    <div key={date}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                          Requested: {dateLabel}
-                        </p>
-                        <div className="flex-1 h-px bg-amber-100" />
-                        <span className="text-xs text-amber-500 font-medium">{txns.length} item{txns.length !== 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="space-y-3">
-                        {txns.map(t => {
-                          const pe = t.pendingEdit || {}
-                          const isSelected = editSelectedIds.has(t.id)
-                          return (
-                            <div key={t.id}
-                              className="bg-white rounded-2xl border overflow-hidden"
-                              style={{ borderColor: isSelected ? '#F59E0B' : '#FDE68A' }}>
-                              {/* Card header */}
-                              <div className="flex items-center gap-2.5 px-3 py-2.5"
-                                style={{ background: isSelected ? '#FFFBEB' : '#FFFDF0' }}>
-                                <input type="checkbox" checked={isSelected} onChange={() => toggleEditOne(t.id)}
-                                  className="w-4 h-4 flex-shrink-0 accent-amber-500 cursor-pointer" />
-                                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                                  style={{ background: '#FEF3C7' }}>
-                                  <span style={{ fontSize: 14 }}>✏️</span>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-bold text-gray-800 text-xs truncate">{t.description || pe.description || '—'}</p>
-                                  <p className="text-amber-600 font-semibold" style={{ fontSize: 9 }}>
-                                    {t.type?.replace(/_/g, ' ')} · {(pe.requestedAt || '').slice(0, 16).replace('T', ' ')}
-                                  </p>
-                                </div>
-                                <div className="flex gap-1.5 flex-shrink-0">
-                                  <button onClick={() => rejectEdit(t.id)}
-                                    className="px-2.5 py-1 rounded-lg font-bold text-white"
-                                    style={{ background: '#6B7280', fontSize: 10 }}>
-                                    ✗ Reject
-                                  </button>
-                                  <button onClick={() => approveEdit(t.id, pe)}
-                                    className="px-2.5 py-1 rounded-lg font-bold text-white"
-                                    style={{ background: '#10B981', fontSize: 10 }}>
-                                    ✓ Approve
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Old vs New comparison */}
-                              <div className="grid grid-cols-2 divide-x divide-gray-100">
-                                <div className="p-3" style={{ background: '#FFF1F2' }}>
-                                  <p className="text-xs font-black text-rose-600 uppercase tracking-wider mb-2">Old Data</p>
-                                  {EDIT_FIELDS.map(({ key, label, format }) => {
-                                    const oldVal = t[key]
-                                    const newVal = pe[key]
-                                    if (oldVal === undefined && newVal === undefined) return null
-                                    const changed = String(oldVal) !== String(newVal) && newVal !== undefined
-                                    return (
-                                      <div key={key} className="mb-1.5">
-                                        <p className="text-gray-400 uppercase tracking-wide" style={{ fontSize: 8 }}>{label}</p>
-                                        <p className={`text-xs font-semibold ${changed ? 'text-rose-700 line-through' : 'text-gray-700'}`}>
-                                          {oldVal !== undefined ? (format ? format(oldVal) : String(oldVal)) : '—'}
-                                        </p>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                                <div className="p-3" style={{ background: '#ECFDF5' }}>
-                                  <p className="text-xs font-black text-emerald-600 uppercase tracking-wider mb-2">New Data</p>
-                                  {EDIT_FIELDS.map(({ key, label, format }) => {
-                                    const oldVal = t[key]
-                                    const newVal = pe[key]
-                                    if (oldVal === undefined && newVal === undefined) return null
-                                    if (newVal === undefined) return null
-                                    const changed = String(oldVal) !== String(newVal)
-                                    return (
-                                      <div key={key} className="mb-1.5">
-                                        <p className="text-gray-400 uppercase tracking-wide" style={{ fontSize: 8 }}>{label}</p>
-                                        <p className={`text-xs font-semibold ${changed ? 'text-emerald-700 font-black' : 'text-gray-700'}`}>
-                                          {format ? format(newVal) : String(newVal)}
-                                          {changed && <span className="ml-1 text-emerald-500" style={{ fontSize: 9 }}>← changed</span>}
-                                        </p>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Edit confirm dialog */}
-              {editConfirmAction && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
-                  <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
-                      style={{ background: editConfirmAction === 'approve' ? '#ECFDF5' : '#F3F4F6' }}>
-                      <span className="text-2xl">{editConfirmAction === 'approve' ? '✓' : '✗'}</span>
-                    </div>
-                    <p className="font-bold text-gray-900 text-lg mb-1">
-                      {editConfirmAction === 'approve'
-                        ? `Approve ${editSelectedIds.size} Edit ${editSelectedIds.size === 1 ? 'Request' : 'Requests'}?`
-                        : `Reject ${editSelectedIds.size} Edit ${editSelectedIds.size === 1 ? 'Request' : 'Requests'}?`}
-                    </p>
-                    <p className="text-gray-500 text-sm mb-5">
-                      {editConfirmAction === 'approve'
-                        ? 'The new data will overwrite the original entries in the ledger.'
-                        : 'The edit requests will be discarded. Original entries remain unchanged.'}
-                    </p>
-                    <div className="flex gap-3">
-                      <button onClick={() => setEditConfirmAction(null)}
-                        className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
-                        Cancel
-                      </button>
-                      <button onClick={() => execEditAction(editConfirmAction)}
-                        className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
-                        style={{ background: editConfirmAction === 'approve' ? '#10B981' : '#6B7280' }}>
-                        {editConfirmAction === 'approve' ? 'Approve All' : 'Reject All'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </>
+      {/* Confirm dialog */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: confirmAction === 'approve' ? '#FEF2F2' : '#ECFDF5' }}>
+              {confirmAction === 'approve'
+                ? <Trash2 size={22} color="#EF4444" />
+                : <span className="text-2xl">↩</span>
+              }
+            </div>
+            <p className="font-bold text-gray-900 text-lg mb-1">
+              {confirmAction === 'approve'
+                ? `Permanently Delete ${selectedIds.size} ${selectedIds.size === 1 ? 'Entry' : 'Entries'}?`
+                : `Recover ${selectedIds.size} ${selectedIds.size === 1 ? 'Entry' : 'Entries'}?`}
+            </p>
+            <p className="text-gray-500 text-sm mb-5">
+              {confirmAction === 'approve'
+                ? 'This will permanently wipe selected entries from the database. This cannot be undone.'
+                : 'Selected entries will be restored to the active ledger immediately.'}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmAction(null)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
+                Cancel
+              </button>
+              <button onClick={() => execAction(confirmAction)}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                style={{ background: confirmAction === 'approve' ? '#EF4444' : '#10B981' }}>
+                {confirmAction === 'approve' ? 'Delete Forever' : 'Restore to Ledger'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -13,7 +13,7 @@ import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
   Search, X as XIcon, Wheat, Printer, Users, FileText,
   LayoutList, Briefcase, Building2, Package, Receipt,
-  Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp,
+  Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp, ShieldAlert,
 } from 'lucide-react'
 import DepoExpenseForm from './components/DepoExpenseForm'
 import DateInput from './components/DateInput'
@@ -62,6 +62,9 @@ const NAV_EXPENSE = [
 const NAV_DEPO = [
   { key: 'DEPO_ADVANCE', label: 'Add Depo Advance', icon: ArrowUpRight },
   { key: 'DEPO_SETTLE',  label: 'Depo Settlement',  icon: FileText     },
+]
+const NAV_ADMIN = [
+  { key: 'DELETE_APPROVALS', label: 'Delete Approvals', icon: ShieldAlert },
 ]
 
 function dayLabel(dateStr) {
@@ -144,7 +147,7 @@ function Sidebar({ activeTab, onTabChange, companyName, navExpense, catColorMap 
       </p>
 
       {/* Expense nav */}
-      <div className="flex flex-col pb-4">
+      <div className="flex flex-col">
         {navExpense.map(item => {
           const Icon = item.icon
           const active = activeTab === item.key
@@ -157,6 +160,31 @@ function Sidebar({ activeTab, onTabChange, companyName, navExpense, catColorMap 
                 : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.45)' }
               }>
               <Icon size={14} color={active ? color : 'rgba(255,255,255,0.3)'} />
+              <span style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{item.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 12px 2px' }} />
+      <p style={{ fontSize: 10, color: 'rgba(239,68,68,0.5)', fontWeight: 700, letterSpacing: 1, padding: '6px 16px 4px', textTransform: 'uppercase' }}>
+        Admin
+      </p>
+
+      {/* Admin nav */}
+      <div className="flex flex-col pb-4">
+        {NAV_ADMIN.map(item => {
+          const Icon = item.icon
+          const active = activeTab === item.key
+          return (
+            <button key={item.key} onClick={() => onTabChange(item.key)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 transition-all text-left"
+              style={active
+                ? { background: 'rgba(239,68,68,0.15)', borderLeft: '3px solid #EF4444', color: '#FCA5A5' }
+                : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.35)' }
+              }>
+              <Icon size={14} color={active ? '#EF4444' : 'rgba(255,100,100,0.4)'} />
               <span style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{item.label}</span>
             </button>
           )
@@ -652,6 +680,219 @@ function DepoView({ mode, transactions, settings }) {
   )
 }
 
+// ── Delete Approvals View ─────────────────────────────────────────────────────
+function DeleteApprovalsView({ settings }) {
+  const { pendingDeletes, approveDelete, recoverTransaction, owners, customCategories = [] } = useApp()
+  const cur = settings.currency || '₹'
+  const [selectedIds, setSelectedIds]     = useState(new Set())
+  const [confirmAction, setConfirmAction] = useState(null) // 'approve' | 'recover'
+
+  const allSelected = pendingDeletes.length > 0 && pendingDeletes.every(t => selectedIds.has(t.id))
+
+  const toggleAll = () => {
+    if (allSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(pendingDeletes.map(t => t.id)))
+  }
+  const toggleOne = (id) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const execAction = (action) => {
+    const ids = [...selectedIds]
+    if (action === 'approve') ids.forEach(id => approveDelete(id))
+    else ids.forEach(id => recoverTransaction(id))
+    setSelectedIds(new Set())
+    setConfirmAction(null)
+  }
+
+  const grouped = useMemo(() => {
+    const map = {}
+    pendingDeletes.forEach(t => {
+      const key = (t.deletedAt || t.date || '').slice(0, 10)
+      if (!map[key]) map[key] = []
+      map[key].push(t)
+    })
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
+  }, [pendingDeletes])
+
+  if (pendingDeletes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+        <div className="w-16 h-16 rounded-3xl bg-green-50 flex items-center justify-center mb-4">
+          <span className="text-3xl">✅</span>
+        </div>
+        <p className="font-bold text-gray-700 text-base">No Pending Deletions</p>
+        <p className="text-gray-400 text-sm mt-1">All clear — nothing awaiting approval.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Summary banner */}
+      <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FFF7ED)', border: '1px solid #FDE68A' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Pending Approval</p>
+            <p className="text-3xl font-black text-amber-800 mt-0.5">{pendingDeletes.length}</p>
+            <p className="text-xs text-amber-600 mt-0.5">entries awaiting review</p>
+          </div>
+          <span className="text-5xl">🗑️</span>
+        </div>
+      </div>
+
+      {/* Global select + action bar */}
+      <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3 flex-wrap">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll}
+            className="w-4 h-4 accent-rose-500 cursor-pointer" />
+          <span className="text-xs font-semibold text-gray-600">Select All</span>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-gray-400">({selectedIds.size} selected)</span>
+          )}
+        </label>
+        {selectedIds.size > 0 && (
+          <div className="flex gap-2">
+            <button onClick={() => setConfirmAction('recover')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: '#10B981' }}>
+              ↩ Recover ({selectedIds.size})
+            </button>
+            <button onClick={() => setConfirmAction('approve')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+              style={{ background: '#EF4444' }}>
+              <Trash2 size={11} /> Delete Forever ({selectedIds.size})
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Grouped list */}
+      <div className="space-y-4">
+        {grouped.map(([date, txns]) => {
+          const today = new Date().toISOString().slice(0, 10)
+          const dateLabel = date === today ? 'Today' : date
+          const allDateSel = txns.every(t => selectedIds.has(t.id))
+          return (
+            <div key={date}>
+              <div className="flex items-center gap-2 mb-2">
+                <input type="checkbox" checked={allDateSel}
+                  className="w-4 h-4 accent-amber-500 cursor-pointer"
+                  onChange={() => {
+                    setSelectedIds(prev => {
+                      const next = new Set(prev)
+                      if (allDateSel) txns.forEach(t => next.delete(t.id))
+                      else txns.forEach(t => next.add(t.id))
+                      return next
+                    })
+                  }}
+                />
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+                  Requested: {dateLabel}
+                </p>
+                <div className="flex-1 h-px bg-amber-100" />
+                <span className="text-xs text-amber-500 font-medium">{txns.length} item{txns.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              <div className="space-y-2">
+                {txns.map(t => {
+                  const inflow = isInflow(t.type)
+                  const partner = t.ownerId   ? owners.find(o => o.id === t.ownerId)
+                                : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
+                  const isSelected = selectedIds.has(t.id)
+                  return (
+                    <div key={t.id}
+                      className="bg-white rounded-xl px-3 py-2.5 border flex items-center gap-2.5"
+                      style={{ borderColor: isSelected ? '#F59E0B' : '#FEF3C7', background: isSelected ? '#FFFBEB' : '#fff' }}>
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleOne(t.id)}
+                        className="w-4 h-4 flex-shrink-0 accent-amber-500 cursor-pointer" />
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: '#FEF3C7' }}>
+                        <span style={{ fontSize: 16 }}>🗑️</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-500 truncate text-xs line-through">{t.description}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                            style={{ background: inflow ? '#ECFDF5' : '#FFF1F2', color: inflow ? '#059669' : '#E11D48', fontSize: 9 }}>
+                            {inflow ? 'Credit' : 'Debit'}
+                          </span>
+                          <span className="text-gray-400" style={{ fontSize: 9 }}>{t.date}</span>
+                          {partner && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                              style={{ background: `${partner.color || '#3B82F6'}15`, color: partner.color || '#3B82F6', fontSize: 9 }}>
+                              {partner.name.split(' ')[0]}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
+                        <p className="font-bold text-sm opacity-60" style={{ color: inflow ? '#059669' : '#E11D48' }}>
+                          {inflow ? '+' : '-'}{formatCurrency(t.amount, cur)}
+                        </p>
+                        <div className="flex gap-1">
+                          <button onClick={() => recoverTransaction(t.id)}
+                            className="px-2 py-1 rounded-lg font-bold text-white"
+                            style={{ background: '#10B981', fontSize: 10 }}>
+                            ↩ Recover
+                          </button>
+                          <button onClick={() => approveDelete(t.id)}
+                            className="px-2 py-1 rounded-lg font-bold text-white"
+                            style={{ background: '#EF4444', fontSize: 10 }}>
+                            ✓ Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Confirm dialog */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: confirmAction === 'approve' ? '#FEF2F2' : '#ECFDF5' }}>
+              {confirmAction === 'approve'
+                ? <Trash2 size={22} color="#EF4444" />
+                : <span className="text-2xl">↩</span>
+              }
+            </div>
+            <p className="font-bold text-gray-900 text-lg mb-1">
+              {confirmAction === 'approve'
+                ? `Permanently Delete ${selectedIds.size} ${selectedIds.size === 1 ? 'Entry' : 'Entries'}?`
+                : `Recover ${selectedIds.size} ${selectedIds.size === 1 ? 'Entry' : 'Entries'}?`}
+            </p>
+            <p className="text-gray-500 text-sm mb-5">
+              {confirmAction === 'approve'
+                ? 'This will permanently wipe selected entries from the database. This cannot be undone.'
+                : 'Selected entries will be restored to the active ledger immediately.'}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmAction(null)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
+                Cancel
+              </button>
+              <button onClick={() => execAction(confirmAction)}
+                className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                style={{ background: confirmAction === 'approve' ? '#EF4444' : '#10B981' }}>
+                {confirmAction === 'approve' ? 'Delete Forever' : 'Restore to Ledger'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 function MainApp() {
   const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction, getMunimBalance, customCategories = [] } = useApp()
@@ -875,7 +1116,8 @@ function MainApp() {
   }
 
   const isDepoTab   = tab === 'DEPO_ADVANCE' || tab === 'DEPO_SETTLE'
-  const activeLabel = [...NAV_MAIN, ...navExpense, ...NAV_DEPO].find(n => n.key === tab)?.label
+  const isAdminTab  = tab === 'DELETE_APPROVALS'
+  const activeLabel = [...NAV_MAIN, ...navExpense, ...NAV_DEPO, ...NAV_ADMIN].find(n => n.key === tab)?.label
 
   return (
     <div className="min-h-screen" style={{ background: '#F1F5F9' }}>
@@ -916,7 +1158,7 @@ function MainApp() {
           {/* Mobile-only horizontal tab scroll */}
           <div className="flex md:hidden overflow-x-auto gap-1.5 px-3 pb-2 scrollbar-none"
             style={{ scrollbarWidth: 'none' }}>
-            {[...NAV_MAIN, ...navExpense, ...NAV_DEPO].map(item => {
+            {[...NAV_MAIN, ...navExpense, ...NAV_DEPO, ...NAV_ADMIN].map(item => {
               const active = tab === item.key
               const color = catColorMap[item.key] || '#818CF8'
               return (
@@ -936,8 +1178,11 @@ function MainApp() {
         {/* ── DEPO VIEW ─────────────────────────────────────────────────── */}
         {isDepoTab && <DepoView mode={tab === 'DEPO_ADVANCE' ? 'advance' : 'settle'} transactions={transactions} settings={settings} />}
 
+        {/* ── DELETE APPROVALS VIEW ────────────────────────────────────── */}
+        {isAdminTab && <DeleteApprovalsView settings={settings} />}
+
         {/* ── CASH IN HAND BANNER ───────────────────────────────────────── */}
-        {tab !== 'STAFF' && !isDepoTab && (
+        {tab !== 'STAFF' && !isDepoTab && !isAdminTab && (
           <div className="mx-3 mt-3 rounded-lg px-3 py-2.5 flex items-center justify-between"
             style={{ background: '#1B5C20' }}>
             <div>
@@ -965,7 +1210,7 @@ function MainApp() {
         )}
 
         {/* ── ENTRY FORMS (tab-switch on mobile, side-by-side on desktop) ── */}
-        {tab !== 'STAFF' && !isDepoTab && (
+        {tab !== 'STAFF' && !isDepoTab && !isAdminTab && (
           <div className="mx-3 mt-2 mb-3">
             {/* Mobile form tab switcher */}
             <div className="flex md:hidden gap-1.5 mb-2">
@@ -1006,7 +1251,7 @@ function MainApp() {
         )}
 
         {/* ── SEARCH + DATE FILTER + PDF/PRINT ─────────────────────────── */}
-        {tab !== 'STAFF' && !isDepoTab && (<><div className="px-3 pt-2 pb-1">
+        {tab !== 'STAFF' && !isDepoTab && !isAdminTab && (<><div className="px-3 pt-2 pb-1">
           {/* Section label */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded" style={{ background: catColorMap[tab] || '#1B5C20' }} />
@@ -1218,7 +1463,7 @@ function MainApp() {
         )}
 
         {/* ── TRANSACTION LIST ──────────────────────────────────────────── */}
-        {tab !== 'BANK' && <div className="px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
+        {tab !== 'BANK' && !isAdminTab && <div className="px-3 pb-6 space-y-3" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
           {grouped.length > 0 && (
             <div className="flex items-center justify-between py-1.5 px-1 border-b border-gray-200 mb-1">
               <label className="flex items-center gap-2 cursor-pointer select-none">

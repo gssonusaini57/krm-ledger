@@ -5,9 +5,10 @@ export const TRANSACTION_TYPES = {
   EXPENSE: 'EXPENSE',
   OWNER_DEPOSIT: 'OWNER_DEPOSIT',
   OWNER_WITHDRAWAL: 'OWNER_WITHDRAWAL',
-  ADVANCE_OUT: 'ADVANCE_OUT',       // Main Cash → Munim (Stage 1)
+  ADVANCE_OUT: 'ADVANCE_OUT',         // Main Cash → Munim (Stage 1)
   ADVANCE_EXPENSE: 'ADVANCE_EXPENSE', // Munim account → Depo expense (Stage 2)
   ADVANCE_RETURN: 'ADVANCE_RETURN',   // Munim → Main Cash (Stage 3)
+  WAGE_ACCRUAL: 'WAGE_ACCRUAL',       // Wages earned but not yet paid (accrued liability)
 }
 
 export const TYPE_LABELS = {
@@ -18,6 +19,7 @@ export const TYPE_LABELS = {
   ADVANCE_OUT: 'Advance Given',
   ADVANCE_EXPENSE: 'Depo Expense',
   ADVANCE_RETURN: 'Advance Returned',
+  WAGE_ACCRUAL: 'Wages Due (Payable)',
 }
 
 export const INCOME_CATEGORIES = [

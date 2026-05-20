@@ -7,13 +7,14 @@ import PartnerDetail from './components/PartnerDetail'
 import EmployeeDetail from './components/EmployeeDetail'
 import AdvancePaymentForm from './components/AdvancePaymentForm'
 import {
-  formatCurrency, formatDate, isInflow, computeRunningBalance, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO
+  formatCurrency, formatDate, isInflow, computeRunningBalance, TRANSACTION_TYPES, OWNER_COLORS, getCategoryLabel, todayISO, DEPO_EXPENSE_CATEGORIES
 } from './utils/helpers'
 import {
   Settings, ArrowUpRight, ArrowDownRight, Pencil, Trash2,
   Search, X as XIcon, Wheat, Printer, Users, FileText,
   LayoutList, Briefcase, Building2, Package, Receipt,
   Truck as TruckIcon, ShoppingBag, TrendingDown, TrendingUp,
+  ShieldAlert,
 } from 'lucide-react'
 import DepoExpenseForm from './components/DepoExpenseForm'
 import DateInput from './components/DateInput'
@@ -62,6 +63,9 @@ const NAV_EXPENSE = [
 const NAV_DEPO = [
   { key: 'DEPO_ADVANCE', label: 'Add Depo Advance', icon: ArrowUpRight },
   { key: 'DEPO_SETTLE',  label: 'Depo Settlement',  icon: FileText     },
+]
+const NAV_ADMIN = [
+  { key: 'DELETE_APPROVALS', label: 'Trash Management', icon: ShieldAlert },
 ]
 
 function dayLabel(dateStr) {
@@ -144,7 +148,7 @@ function Sidebar({ activeTab, onTabChange, companyName, navExpense, catColorMap 
       </p>
 
       {/* Expense nav */}
-      <div className="flex flex-col pb-4">
+      <div className="flex flex-col">
         {navExpense.map(item => {
           const Icon = item.icon
           const active = activeTab === item.key
@@ -157,6 +161,31 @@ function Sidebar({ activeTab, onTabChange, companyName, navExpense, catColorMap 
                 : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.45)' }
               }>
               <Icon size={14} color={active ? color : 'rgba(255,255,255,0.3)'} />
+              <span style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{item.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 12px 2px' }} />
+      <p style={{ fontSize: 10, color: 'rgba(239,68,68,0.6)', fontWeight: 700, letterSpacing: 1, padding: '6px 16px 4px', textTransform: 'uppercase' }}>
+        🛡️ Admin
+      </p>
+
+      {/* Admin nav */}
+      <div className="flex flex-col pb-4">
+        {NAV_ADMIN.map(item => {
+          const Icon = item.icon
+          const active = activeTab === item.key
+          return (
+            <button key={item.key} onClick={() => onTabChange(item.key)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 transition-all text-left"
+              style={active
+                ? { background: 'rgba(239,68,68,0.15)', borderLeft: '3px solid #EF4444', color: '#FCA5A5' }
+                : { borderLeft: '3px solid transparent', color: 'rgba(255,255,255,0.45)' }
+              }>
+              <Icon size={14} color={active ? '#EF4444' : 'rgba(255,255,255,0.3)'} />
               <span style={{ fontSize: 12, fontWeight: active ? 600 : 400 }}>{item.label}</span>
             </button>
           )
@@ -297,100 +326,678 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
 }
 
 // ── Staff View ────────────────────────────────────────────────────────────────
+// ── Staff View ────────────────────────────────────────────────────────────────
 function StaffView({ employees, transactions, settings, onEmployeeClick }) {
-  const currentMonth = format(new Date(), 'yyyy-MM')
-  const monthLabel   = format(new Date(), 'MMMM yyyy')
+  const { addTransaction, settleWageAccrual } = useApp()
+  const cur = settings.currency || '₹'
 
   const fixedEmps    = employees.filter(e => e.type === 'FIXED')
   const variableEmps = employees.filter(e => e.type === 'VARIABLE')
 
-  const getStats = (emp) => {
-    const txns = transactions.filter(t => t.employeeId === emp.id && t.date.startsWith(currentMonth))
+  const monthOptions = useMemo(() => {
+    const opts = []
+    const now = new Date()
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      opts.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') })
+    }
+    return opts
+  }, [])
+
+  const [filterEmpId,   setFilterEmpId]   = useState('')
+  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0].value)
+  const [payDate,  setPayDate]  = useState(todayISO())
+  const [payMode,  setPayMode]  = useState('CASH')
+  const [amounts,  setAmounts]  = useState({})
+  const [notes,    setNotes]    = useState({})
+  const [processing, setProcessing] = useState(false)
+  const [doneCount,  setDoneCount]  = useState(null)
+  const [payingEntry, setPayingEntry] = useState(null)   // accrual being paid
+  const [payEntryDate, setPayEntryDate] = useState(todayISO())
+  const [payEntryMode, setPayEntryMode] = useState('CASH')
+  const [payEntryLoading, setPayEntryLoading] = useState(false)
+
+  const monthLabel   = monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth
+  const selectedEmp  = filterEmpId ? employees.find(e => e.id === filterEmpId) : null
+
+  // For payout form: show all variable emps, or just the filtered one
+  const payoutEmps = filterEmpId
+    ? variableEmps.filter(e => e.id === filterEmpId)
+    : variableEmps
+
+  const getEmpTxns = (emp) =>
+    transactions
+      .filter(t => t.employeeId === emp.id && t.date.startsWith(selectedMonth))
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || '').localeCompare(b.createdAt || ''))
+
+  const getEmpStats = (emp) => {
+    const txns = getEmpTxns(emp)
     const paid = txns.reduce((s, t) => s + t.amount, 0)
     return { paid, count: txns.length, remaining: emp.type === 'FIXED' ? (emp.salary || 0) - paid : null }
+  }
+
+  // Full ledger for a selected employee — ALL months, no date filter
+  // Month chip only filters the "All Employees" overview stats, not the individual ledger
+  const buildLedger = (emp) => {
+    const txns = transactions
+      .filter(t => t.employeeId === emp.id &&
+        (t.type === TRANSACTION_TYPES.WAGE_ACCRUAL || t.type === TRANSACTION_TYPES.EXPENSE))
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || '').localeCompare(b.createdAt || ''))
+    let running = 0
+    return txns.map(t => {
+      const isAccrual = t.type === TRANSACTION_TYPES.WAGE_ACCRUAL
+      const isPayment = t.type === TRANSACTION_TYPES.EXPENSE
+      const credit = isAccrual ? t.amount : 0
+      const debit  = isPayment ? t.amount : 0
+      if (isAccrual) running += t.amount
+      if (isPayment) running -= t.amount
+      return { ...t, credit, debit, running }
+    })
+  }
+
+  const handleSettlePay = async (entry) => {
+    setPayEntryLoading(true)
+    await settleWageAccrual(entry, payEntryDate, payEntryMode)
+    setPayEntryLoading(false)
+    setPayingEntry(null)
+    setPayEntryDate(todayISO())
+  }
+
+  const handlePrint = (emp, ledger) => {
+    const companyName = settings.companyName || 'KRM Rice Mill'
+    const monthLabel  = monthOptions.find(m => m.value === selectedMonth)?.label || selectedMonth
+    const totalCredit = ledger.reduce((s, r) => s + r.credit, 0)
+    const totalDebit  = ledger.reduce((s, r) => s + r.debit, 0)
+    const closing     = ledger[ledger.length - 1]?.running ?? 0
+    const fmt = (n) => `${cur}${Math.abs(n).toLocaleString('en-IN')}`
+
+    const rows = ledger.map(r => `
+      <tr>
+        <td>${formatDate(r.date)}</td>
+        <td>${r.description || '—'}</td>
+        <td class="num credit">${r.credit > 0 ? fmt(r.credit) : '—'}</td>
+        <td class="num debit">${r.debit  > 0 ? fmt(r.debit)  : '—'}</td>
+        <td class="num balance">${fmt(r.running)}</td>
+      </tr>
+    `).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ledger – ${emp.name} – ${monthLabel}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1E293B; padding: 24px; }
+  .header { border-bottom: 2px solid #1E293B; padding-bottom: 12px; margin-bottom: 16px; }
+  .company { font-size: 18px; font-weight: 800; color: #1B5C20; }
+  .sub { font-size: 11px; color: #64748B; margin-top: 2px; }
+  .emp-block { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .emp-name { font-size: 15px; font-weight: 700; }
+  .emp-type { font-size: 11px; color: #64748B; margin-top: 2px; }
+  .period-label { font-size: 11px; color: #64748B; text-align: right; }
+  .period-val { font-size: 13px; font-weight: 700; text-align: right; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  thead tr { background: #1E293B; color: #fff; }
+  thead th { padding: 8px 10px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  thead th.num { text-align: right; }
+  tbody tr:nth-child(even) { background: #F8FAFC; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #E2E8F0; font-size: 11.5px; }
+  .num { text-align: right; font-weight: 600; }
+  .credit  { color: #059669; }
+  .debit   { color: #E11D48; }
+  .balance { color: #1E293B; font-weight: 700; }
+  .totals-row { background: #F1F5F9 !important; font-weight: 700; border-top: 2px solid #CBD5E1; }
+  .closing { margin-top: 16px; border-top: 2px solid #1E293B; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .closing-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .closing-val { font-size: 16px; font-weight: 800; color: ${closing > 0 ? '#EA580C' : '#059669'}; }
+  .footer { margin-top: 20px; font-size: 10px; color: #94A3B8; text-align: center; }
+  @media print {
+    body { padding: 12px; }
+    button { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="company">${companyName}</div>
+  <div class="sub">Employee Wage Ledger Statement</div>
+</div>
+<div class="emp-block">
+  <div>
+    <div class="emp-name">${emp.name}</div>
+    <div class="emp-type">${emp.type === 'FIXED' ? `Fixed Salary — ${cur}${Number(emp.salary||0).toLocaleString('en-IN')}/month` : 'Variable Labour'}</div>
+  </div>
+  <div>
+    <div class="period-label">Statement Period</div>
+    <div class="period-val">${monthLabel}</div>
+  </div>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Particulars</th>
+      <th class="num">Credit (+)</th>
+      <th class="num">Debit (−)</th>
+      <th class="num">Balance</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rows}
+    <tr class="totals-row">
+      <td colspan="2">Total</td>
+      <td class="num credit">${fmt(totalCredit)}</td>
+      <td class="num debit">${fmt(totalDebit)}</td>
+      <td class="num balance">${fmt(closing)}</td>
+    </tr>
+  </tbody>
+</table>
+<div class="closing">
+  <span class="closing-label">Closing Balance (Outstanding)</span>
+  <span class="closing-val">${closing > 0 ? `${fmt(closing)} Owed` : closing < 0 ? `${fmt(closing)} Overpaid` : 'Fully Settled ✓'}</span>
+</div>
+<div class="footer">Printed on ${new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' })} — ${companyName}</div>
+<script>window.onload = () => { window.print() }<\/script>
+</body>
+</html>`
+
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+  }
+
+  const handleProcess = async () => {
+    const toProcess = payoutEmps.filter(e => parseFloat(amounts[e.id]) > 0)
+    if (!toProcess.length) return
+    setProcessing(true)
+    for (const emp of toProcess) {
+      const amt  = parseFloat(amounts[emp.id])
+      const note = (notes[emp.id] || '').trim()
+      await addTransaction({
+        date: payDate,
+        amount: amt,
+        description: note || `Labour – ${emp.name} (${monthLabel})`,
+        category: 'LABOUR',
+        type: TRANSACTION_TYPES.WAGE_ACCRUAL,
+        employeeId: emp.id,
+        ownerId: null, partnerId: null,
+        linkedCategories: ['LABOUR'],
+      })
+    }
+    setAmounts({})
+    setNotes({})
+    setProcessing(false)
+    setDoneCount(toProcess.length)
+    // Auto-navigate: if one worker was processed, jump straight to their ledger
+    if (toProcess.length === 1) {
+      setFilterEmpId(toProcess[0].id)
+      setSelectedMonth(payDate.slice(0, 7))
+      setPayingEntry(null)
+    }
+    setTimeout(() => setDoneCount(null), 3000)
   }
 
   if (employees.length === 0) return (
     <div className="flex flex-col items-center justify-center py-20 text-center px-6">
       <p className="text-gray-500 font-semibold text-sm">No staff added yet</p>
-      <p className="text-gray-400 text-xs mt-1">Settings → Staff mein employees add karo</p>
+      <p className="text-gray-400 text-xs mt-1">Settings → Staff to add employees</p>
     </div>
   )
 
   return (
-    <div className="px-3 pt-2 pb-8">
-      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">{monthLabel}</p>
+    <div className="px-3 pt-2 pb-8 space-y-3">
 
-      {fixedEmps.length > 0 && (
-        <div className="mb-4">
-          <p className="text-xs font-bold px-1 mb-2" style={{ color: '#8B5CF6' }}>Fixed Salary</p>
-          <div className="space-y-2">
-            {fixedEmps.map(emp => {
-              const { paid, remaining } = getStats(emp)
+      {/* ── Labour Name chip row ── */}
+      <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: '2px solid #7C3AED' }}>
+        {/* Section label bar */}
+        <div className="px-4 py-2.5 flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}>
+          <span className="text-xs font-black text-white uppercase tracking-widest">Select Worker</span>
+          <span className="text-xs text-purple-200 font-medium">{employees.length} staff</span>
+        </div>
+
+        {/* Name buttons — always visible, never hidden */}
+        <div className="bg-white px-3 py-3">
+          <div className="flex flex-wrap gap-2">
+            {/* All overview */}
+            <button
+              onClick={() => { setFilterEmpId(''); setPayingEntry(null) }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-sm font-black border-2 transition-all"
+              style={!filterEmpId
+                ? { background: '#1E293B', borderColor: '#1E293B', color: '#fff', boxShadow: '0 3px 10px rgba(30,41,59,0.35)' }
+                : { background: '#F8FAFC', borderColor: '#CBD5E1', color: '#475569' }}>
+              All
+            </button>
+
+            {/* Fixed salary — purple chips */}
+            {fixedEmps.map(e => (
+              <button key={e.id}
+                onClick={() => { setFilterEmpId(e.id); setPayingEntry(null) }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-black border-2 transition-all"
+                style={filterEmpId === e.id
+                  ? { background: '#7C3AED', borderColor: '#7C3AED', color: '#fff', boxShadow: '0 3px 10px rgba(124,58,237,0.4)' }
+                  : { background: '#F5F3FF', borderColor: '#C4B5FD', color: '#5B21B6' }}>
+                <span className="w-6 h-6 rounded-xl flex items-center justify-center text-xs font-black"
+                  style={filterEmpId === e.id ? { background: 'rgba(255,255,255,0.3)' } : { background: '#DDD6FE' }}>
+                  {e.name.charAt(0).toUpperCase()}
+                </span>
+                {e.name}
+              </button>
+            ))}
+
+            {/* Variable labour — orange chips */}
+            {variableEmps.map(e => (
+              <button key={e.id}
+                onClick={() => { setFilterEmpId(e.id); setPayingEntry(null) }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-black border-2 transition-all"
+                style={filterEmpId === e.id
+                  ? { background: '#EA580C', borderColor: '#EA580C', color: '#fff', boxShadow: '0 3px 10px rgba(234,88,12,0.4)' }
+                  : { background: '#FFF7ED', borderColor: '#FED7AA', color: '#9A3412' }}>
+                <span className="w-6 h-6 rounded-xl flex items-center justify-center text-xs font-black"
+                  style={filterEmpId === e.id ? { background: 'rgba(255,255,255,0.3)' } : { background: '#FFEDD5' }}>
+                  {e.name.charAt(0).toUpperCase()}
+                </span>
+                {e.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex gap-4 mt-2.5 pt-2.5 border-t border-gray-100">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#7C3AED' }} />
+              Fixed Salary
+            </span>
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#EA580C' }} />
+              Variable Labour
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Month chip row — filters All-Employees overview stats only ── */}
+      <div className="rounded-2xl overflow-hidden shadow-sm" style={{ border: '2px solid #1B5C20' }}>
+        <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'linear-gradient(135deg,#1B5C20,#166534)' }}>
+          <span className="text-xs font-black text-white uppercase tracking-widest">Month</span>
+          {selectedEmp && <span className="text-xs text-green-200 font-medium">Overview filter only — ledger shows full history</span>}
+        </div>
+        <div className="bg-white px-3 py-3">
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {monthOptions.map(m => (
+              <button key={m.value}
+                onClick={() => { setSelectedMonth(m.value); setPayingEntry(null) }}
+                className="flex-shrink-0 px-4 py-2.5 rounded-2xl text-sm font-black border-2 transition-all whitespace-nowrap"
+                style={selectedMonth === m.value
+                  ? { background: '#1B5C20', borderColor: '#1B5C20', color: '#fff', boxShadow: '0 3px 10px rgba(27,92,32,0.4)' }
+                  : { background: '#F0FDF4', borderColor: '#86EFAC', color: '#166534' }}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bank-statement view when specific employee is selected ── */}
+      {selectedEmp && (() => {
+        const ledger  = buildLedger(selectedEmp)
+        const isFixed = selectedEmp.type === 'FIXED'
+        const closing = ledger[ledger.length - 1]?.running ?? 0
+        const totalCredit = ledger.reduce((s, r) => s + r.credit, 0)
+        const totalDebit  = ledger.reduce((s, r) => s + r.debit, 0)
+        return (
+          <div>
+            {/* Employee header + Print button */}
+            <div className="flex items-center gap-3 mb-3 px-1">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base flex-shrink-0"
+                style={{ background: isFixed ? '#EDE9FE' : '#FFF7ED', color: isFixed ? '#7C3AED' : '#EA580C' }}>
+                {selectedEmp.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-gray-900 text-sm">{selectedEmp.name}</p>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: isFixed ? '#EDE9FE' : '#FFF7ED', color: isFixed ? '#7C3AED' : '#EA580C' }}>
+                    {isFixed ? 'Fixed' : 'Variable'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400">
+                  {isFixed
+                    ? `Base: ${cur}${Number(selectedEmp.salary||0).toLocaleString('en-IN')}/month`
+                    : 'Variable labour — manual wage entry'}
+                </p>
+              </div>
+              <button
+                onClick={() => handlePrint(selectedEmp, ledger)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#1E293B,#334155)' }}>
+                <Printer size={12} /> Print
+              </button>
+            </div>
+
+            {/* Summary cards */}
+            <div className={`grid gap-2 mb-3 ${isFixed ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {isFixed && (
+                <div className="bg-purple-50 rounded-xl p-2 text-center">
+                  <p className="text-xs text-gray-400 mb-0.5">Salary</p>
+                  <p className="font-bold text-purple-700 text-xs">{cur}{Number(selectedEmp.salary||0).toLocaleString('en-IN')}</p>
+                </div>
+              )}
+              <div className="bg-emerald-50 rounded-xl p-2 text-center">
+                <p className="text-xs text-gray-400 mb-0.5">Earned</p>
+                <p className="font-bold text-emerald-600 text-xs">{cur}{totalCredit.toLocaleString('en-IN')}</p>
+              </div>
+              <div className="rounded-xl p-2 text-center" style={{ background: '#FFF1F2' }}>
+                <p className="text-xs text-gray-400 mb-0.5">Paid</p>
+                <p className="font-bold text-rose-500 text-xs">{cur}{totalDebit.toLocaleString('en-IN')}</p>
+              </div>
+              <div className="rounded-xl p-2 text-center"
+                style={{ background: closing > 0 ? '#FFF7ED' : '#ECFDF5' }}>
+                <p className="text-xs text-gray-400 mb-0.5">Due</p>
+                <p className="font-bold text-xs" style={{ color: closing > 0 ? '#EA580C' : '#059669' }}>
+                  {cur}{Math.abs(closing).toLocaleString('en-IN')}
+                  {closing < 0 ? ' (overpaid)' : ''}
+                </p>
+              </div>
+            </div>
+
+            {/* Bank-statement table */}
+            {ledger.length === 0 ? (
+              <div className="text-center py-8 rounded-2xl bg-gray-50 text-gray-400 text-sm">
+                No wage entries found for {selectedEmp?.name}.<br />
+                <span className="text-xs">Use the Variable Labour form below to record wages.</span>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                {/* Column headers */}
+                <div className="grid px-3 py-2 bg-gray-800 text-xs font-bold uppercase tracking-wider"
+                  style={{ gridTemplateColumns: '0.85fr 2fr 0.9fr 0.9fr 0.9fr' }}>
+                  <span className="text-gray-300">Date</span>
+                  <span className="text-gray-300">Particulars</span>
+                  <span className="text-emerald-400 text-right">Credit+</span>
+                  <span className="text-rose-400 text-right">Debit−</span>
+                  <span className="text-blue-300 text-right">Balance</span>
+                </div>
+                {/* Rows */}
+                {ledger.map((entry, i) => {
+                  const isPending = entry.type === TRANSACTION_TYPES.WAGE_ACCRUAL && !entry.settledAt
+                  const isPaying  = payingEntry?.id === entry.id
+                  return (
+                    <div key={entry.id} className={i > 0 ? 'border-t border-gray-50' : ''}>
+                      <div className="grid items-start px-3 py-2.5"
+                        style={{ gridTemplateColumns: '0.85fr 2fr 0.9fr 0.9fr 0.9fr' }}>
+                        {/* Date */}
+                        <p className="text-xs font-semibold text-gray-700 leading-tight pt-0.5">{formatDate(entry.date)}</p>
+                        {/* Particulars */}
+                        <div className="min-w-0 pr-1">
+                          <p className="text-xs text-gray-700 font-medium leading-tight truncate">{entry.description || '—'}</p>
+                          {entry.type === TRANSACTION_TYPES.WAGE_ACCRUAL && (
+                            <span className="inline-block mt-0.5 text-xs font-bold px-1.5 py-0.5 rounded-md leading-none"
+                              style={entry.settledAt
+                                ? { background: '#ECFDF5', color: '#059669' }
+                                : { background: '#FFF7ED', color: '#EA580C' }}>
+                              {entry.settledAt ? '✓ Paid' : '⏳ Pending'}
+                            </span>
+                          )}
+                        </div>
+                        {/* Credit */}
+                        <p className="text-right text-xs font-bold" style={{ color: entry.credit > 0 ? '#059669' : '#D1D5DB' }}>
+                          {entry.credit > 0 ? `${cur}${entry.credit.toLocaleString('en-IN')}` : '—'}
+                        </p>
+                        {/* Debit */}
+                        <p className="text-right text-xs font-bold" style={{ color: entry.debit > 0 ? '#E11D48' : '#D1D5DB' }}>
+                          {entry.debit > 0 ? `${cur}${entry.debit.toLocaleString('en-IN')}` : '—'}
+                        </p>
+                        {/* Balance + Pay Now */}
+                        <div className="text-right">
+                          <p className="text-xs font-black" style={{ color: entry.running > 0 ? '#1E293B' : '#059669' }}>
+                            {cur}{Math.abs(entry.running).toLocaleString('en-IN')}
+                          </p>
+                          {isPending && !isPaying && (
+                            <button onClick={() => { setPayingEntry(entry); setPayEntryDate(todayISO()) }}
+                              className="text-xs font-bold mt-0.5 px-2 py-0.5 rounded-lg"
+                              style={{ background: '#3B82F6', color: '#fff' }}>
+                              Pay Now
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {/* Inline Pay form */}
+                      {isPaying && (
+                        <div className="mx-3 mb-2.5 p-3 rounded-xl border border-blue-100 bg-blue-50 space-y-2">
+                          <p className="text-xs font-bold text-blue-700">Record Payment — {cur}{entry.amount.toLocaleString('en-IN')}</p>
+                          <div className="flex gap-2">
+                            <DateInput value={payEntryDate} onChange={e => setPayEntryDate(e.target.value)}
+                              style={{ flex: 1, padding: '7px 10px', border: '1.5px solid #BFDBFE', borderRadius: 10, fontSize: 12, background: '#fff' }} />
+                            <div className="flex gap-1">
+                              {[{k:'CASH',l:'💵'},{k:'ONLINE',l:'📱'}].map(o=>(
+                                <button key={o.k} type="button" onClick={() => setPayEntryMode(o.k)}
+                                  className="w-9 h-9 rounded-lg text-sm border-2 transition-all"
+                                  style={payEntryMode===o.k?{borderColor:'#3B82F6',background:'#EFF6FF'}:{borderColor:'#E2E8F0',background:'#fff'}}>
+                                  {o.l}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setPayingEntry(null)}
+                              className="flex-1 py-2 rounded-xl border-2 border-gray-200 text-xs font-semibold text-gray-500">Cancel</button>
+                            <button onClick={() => handleSettlePay(entry)} disabled={payEntryLoading}
+                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white"
+                              style={{ background: payEntryLoading ? '#D1D5DB' : '#3B82F6' }}>
+                              {payEntryLoading ? 'Saving…' : 'Mark as Paid'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                {/* Totals row */}
+                <div className="grid px-3 py-2 bg-gray-50 border-t-2 border-gray-200 text-xs font-bold"
+                  style={{ gridTemplateColumns: '0.85fr 2fr 0.9fr 0.9fr 0.9fr' }}>
+                  <span className="text-gray-500 uppercase tracking-wider col-span-2">Total</span>
+                  <span className="text-right text-emerald-600">{cur}{totalCredit.toLocaleString('en-IN')}</span>
+                  <span className="text-right text-rose-500">{cur}{totalDebit.toLocaleString('en-IN')}</span>
+                  <span className="text-right text-gray-800">{cur}{Math.abs(closing).toLocaleString('en-IN')}</span>
+                </div>
+                {/* Closing balance */}
+                <div className="flex items-center justify-between px-3 py-2.5 border-t border-gray-200 bg-gray-800 rounded-b-2xl">
+                  <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Closing Balance</span>
+                  <span className="text-sm font-black" style={{ color: closing > 0 ? '#FB923C' : '#34D399' }}>
+                    {closing > 0 ? `${cur}${closing.toLocaleString('en-IN')} Owed` : closing < 0 ? `${cur}${Math.abs(closing).toLocaleString('en-IN')} Overpaid` : 'Fully Settled ✓'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── All-employees view (no filter) ── */}
+      {!selectedEmp && fixedEmps.length > 0 && (
+        <div>
+          <p className="text-xs font-bold px-1 mb-1.5 uppercase tracking-wider" style={{ color: '#8B5CF6' }}>Fixed Salary</p>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {fixedEmps.map((emp, i) => {
+              const { paid, remaining } = getEmpStats(emp)
               return (
                 <div key={emp.id} onClick={() => onEmployeeClick(emp)}
-                  className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 cursor-pointer active:scale-95 transition-transform">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm flex-shrink-0">
+                  className={`flex items-center gap-3 px-3 py-3 cursor-pointer active:bg-gray-50 transition-colors ${i > 0 ? 'border-t border-gray-50' : ''}`}>
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm flex-shrink-0">
+                    {emp.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm truncate">{emp.name}</p>
+                    <p className="text-xs text-gray-400">Paid {cur}{paid.toLocaleString('en-IN')} / {cur}{Number(emp.salary||0).toLocaleString('en-IN')}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-black" style={{ color: '#7C3AED' }}>{cur}{Number(emp.salary||0).toLocaleString('en-IN')}</p>
+                    <p className="text-xs font-semibold" style={{ color: remaining >= 0 ? '#059669' : '#E11D48' }}>
+                      {remaining >= 0 ? `${cur}${remaining.toLocaleString('en-IN')} due` : 'Overpaid'}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Variable Labour payout form ── */}
+      {payoutEmps.length > 0 && (
+        <div>
+          <p className="text-xs font-bold px-1 mb-1.5 uppercase tracking-wider" style={{ color: '#F97316' }}>Variable Labour — Record Wages</p>
+
+          {/* Pay date + mode */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-3 space-y-2">
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Entry Date</label>
+              <DateInput value={payDate} onChange={e => setPayDate(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', border: '1.5px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB' }} />
+            </div>
+          </div>
+
+          {/* Worker rows */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-3">
+            {payoutEmps.map((emp, i) => {
+              const { paid, count } = getEmpStats(emp)
+              const hasAmt = parseFloat(amounts[emp.id]) > 0
+              return (
+                <div key={emp.id} className={`px-3 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0">
                       {emp.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 text-sm">{emp.name}</p>
-                      <p className="text-xs text-gray-400">₹{Number(emp.salary||0).toLocaleString('en-IN')}/month</p>
-                    </div>
-                    <span className="text-xs text-gray-400">Tap for details →</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-gray-50 rounded-xl p-2 text-center">
-                      <p className="text-xs text-gray-400 mb-0.5">Salary</p>
-                      <p className="font-bold text-gray-700 text-xs">{formatCurrency(emp.salary||0, settings.currency)}</p>
-                    </div>
-                    <div className="bg-rose-50 rounded-xl p-2 text-center">
-                      <p className="text-xs text-gray-400 mb-0.5">Paid</p>
-                      <p className="font-bold text-rose-500 text-xs">{formatCurrency(paid, settings.currency)}</p>
-                    </div>
-                    <div className="rounded-xl p-2 text-center" style={{ background: remaining >= 0 ? '#ECFDF5' : '#FFF1F2' }}>
-                      <p className="text-xs text-gray-400 mb-0.5">{remaining >= 0 ? 'Remaining' : 'Excess'}</p>
-                      <p className="font-bold text-xs" style={{ color: remaining >= 0 ? '#059669' : '#E11D48' }}>
-                        {formatCurrency(Math.abs(remaining), settings.currency)}
+                      <p className="font-bold text-gray-900 text-sm truncate">{emp.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {monthLabel}: {count > 0 ? `${cur}${paid.toLocaleString('en-IN')} logged` : 'No entries yet'}
                       </p>
                     </div>
+                    <button onClick={() => onEmployeeClick(emp)} className="text-xs text-gray-400 whitespace-nowrap">History →</button>
                   </div>
+                  <div className="mb-2">
+                    <label className="text-xs font-bold uppercase tracking-wider block mb-1"
+                      style={{ color: hasAmt ? '#F97316' : '#94A3B8' }}>Amount ({cur})</label>
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 transition-all"
+                      style={{ background: hasAmt ? '#FFF7ED' : '#F9FAFB', borderColor: hasAmt ? '#F97316' : '#E2E8F0' }}>
+                      <span className="font-black select-none" style={{ color: hasAmt ? '#F97316' : '#CBD5E1', fontSize: 16 }}>{cur}</span>
+                      <input type="number" min="0" step="any" placeholder="Enter wages for this month"
+                        value={amounts[emp.id] || ''}
+                        onChange={e => setAmounts(a => ({ ...a, [emp.id]: e.target.value }))}
+                        style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 20, fontWeight: 800, color: '#1E293B', outline: 'none' }} />
+                    </div>
+                  </div>
+                  <input type="text" placeholder="Note (optional)"
+                    value={notes[emp.id] || ''}
+                    onChange={e => setNotes(n => ({ ...n, [emp.id]: e.target.value }))}
+                    style={{ width: '100%', padding: '6px 10px', border: '1.5px solid #E2E8F0', borderRadius: 10, fontSize: 12, background: '#F9FAFB', outline: 'none', color: '#64748B' }} />
                 </div>
               )
             })}
           </div>
-        </div>
-      )}
 
-      {variableEmps.length > 0 && (
-        <div>
-          <p className="text-xs font-bold px-1 mb-2" style={{ color: '#F97316' }}>Variable Labour</p>
-          <div className="space-y-2">
-            {variableEmps.map(emp => {
-              const { paid, count } = getStats(emp)
-              return (
-                <div key={emp.id} onClick={() => onEmployeeClick(emp)}
-                  className="bg-white rounded-xl p-3.5 shadow-sm border border-gray-100 cursor-pointer active:scale-95 transition-transform">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0">
-                      {emp.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-sm">{emp.name}</p>
-                      <p className="text-xs text-gray-400">{count} payment{count !== 1 ? 's' : ''} this month</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400">Total Paid</p>
-                      <p className="font-bold text-rose-500 text-sm">{formatCurrency(paid, settings.currency)}</p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <p className="text-xs text-gray-400 text-center mb-2">
+            Wages recorded here appear as <strong>Pending Payable</strong> — cash deducted only when you click "Pay Now"
+          </p>
+
+          {doneCount !== null ? (
+            <div className="py-3.5 rounded-2xl text-center text-sm font-bold text-white" style={{ background: '#10B981' }}>
+              ✓ {doneCount} wage entr{doneCount !== 1 ? 'ies' : 'y'} recorded as Pending for {monthLabel}
+            </div>
+          ) : (
+            <button onClick={handleProcess}
+              disabled={processing || !payoutEmps.some(e => parseFloat(amounts[e.id]) > 0)}
+              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all"
+              style={{ background: (!processing && payoutEmps.some(e => parseFloat(amounts[e.id]) > 0))
+                ? 'linear-gradient(135deg,#F97316,#EF4444)' : '#D1D5DB' }}>
+              {processing ? 'Recording…' : 'Record as Wages Due (Pending)'}
+            </button>
+          )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Depo Edit Modal ───────────────────────────────────────────────────────────
+function DepoEditModal({ txn, onClose }) {
+  const { requestEdit, settings, customCategories = [] } = useApp()
+  const cur = settings.currency || '₹'
+  const [date, setDate]               = useState(txn.date || '')
+  const [amount, setAmount]           = useState(String(txn.amount || ''))
+  const [description, setDescription] = useState(txn.description || '')
+  const [category, setCategory]       = useState(txn.category || '')
+  const [loading, setLoading]         = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const amt = parseFloat(amount)
+    if (!amt || amt <= 0) return
+    setLoading(true)
+    await requestEdit(txn.id, {
+      date, amount: amt, description,
+      ...(txn.type === TRANSACTION_TYPES.ADVANCE_EXPENSE ? { category } : {}),
+    })
+    setLoading(false)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-bold text-gray-900">Edit Depo Entry</p>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400">
+            <XIcon size={15} />
+          </button>
+        </div>
+        <div className="mb-4 px-3 py-2 rounded-xl text-xs font-medium text-amber-700"
+          style={{ background: '#FEF3C7', border: '1px solid #FDE68A' }}>
+          Changes will be sent for Admin approval before taking effect.
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 block mb-1">Date</label>
+            <DateInput value={date} onChange={e => setDate(e.target.value)} required
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB' }} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 block mb-1">Amount ({cur})</label>
+            <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0.01" step="any"
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 block mb-1">Description</label>
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB', outline: 'none' }} />
+          </div>
+          {txn.type === TRANSACTION_TYPES.ADVANCE_EXPENSE && (
+            <div>
+              <label className="text-xs font-semibold text-gray-500 block mb-1">Category</label>
+              <select value={category} onChange={e => setCategory(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 13, background: '#F9FAFB', outline: 'none' }}>
+                {DEPO_EXPENSE_CATEGORIES.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading}
+              className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+              style={{ background: loading ? '#9CA3AF' : '#3B82F6' }}>
+              {loading ? 'Submitting…' : 'Submit for Approval'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
@@ -400,6 +1007,7 @@ function DepoView({ mode, transactions, settings }) {
   const { deleteTransaction, customCategories = [] } = useApp()
   const cur = settings.currency || '₹'
   const [confirmDel, setConfirmDel]       = useState(null)
+  const [editTxn, setEditTxn]             = useState(null)
   const [filterFrom, setFilterFrom]       = useState('')
   const [filterTo, setFilterTo]           = useState('')
   const [filterType, setFilterType]       = useState('')
@@ -589,16 +1197,27 @@ function DepoView({ mode, transactions, settings }) {
                           <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 999, background: `${catColor}18`, color: catColor }}>{getCategoryLabel(t.category, customCategories)}</span>
                         )}
                         <span style={{ fontSize: 9, color: '#9CA3AF' }}>{formatDate(t.date)}</span>
+                        {t.status === 'pending_edit' && (
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: '#FEF3C7', color: '#D97706' }}>✏️ Pending Edit</span>
+                        )}
                       </div>
                     </div>
                     <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                       <p style={{ fontWeight: 700, fontSize: 13, color: s.color }}>
                         {t.type === TRANSACTION_TYPES.ADVANCE_RETURN ? '+' : '-'}{formatCurrency(t.amount, cur)}
                       </p>
-                      <button onClick={e => { e.stopPropagation(); setConfirmDel(t) }}
-                        className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
-                        <Trash2 size={10} />
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={e => { e.stopPropagation(); setEditTxn(t) }}
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                          title="Request edit">
+                          <Pencil size={10} />
+                        </button>
+                        <button onClick={e => { e.stopPropagation(); setConfirmDel(t) }}
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                          title="Request delete">
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -647,6 +1266,414 @@ function DepoView({ mode, transactions, settings }) {
             </div>
           </div>
         </div>
+      )}
+
+      {editTxn && <DepoEditModal txn={editTxn} onClose={() => setEditTxn(null)} />}
+    </div>
+  )
+}
+
+// ── Delete Approvals Admin View ───────────────────────────────────────────────
+function DeleteApprovalsView({ settings }) {
+  const {
+    pendingDeletes, pendingEdits = [],
+    approveDelete, recoverTransaction,
+    approveEdit, rejectEdit,
+    owners,
+  } = useApp()
+  const cur = settings.currency || '₹'
+  const [subTab, setSubTab] = useState('delete') // 'delete' | 'edit'
+
+  // ── Delete tab state ──────────────────────────────────────────────────────
+  const [delSelectedIds, setDelSelectedIds] = useState(new Set())
+  const [delConfirm, setDelConfirm]         = useState(null) // 'approve' | 'recover'
+
+  const allDelSelected = pendingDeletes.length > 0 && pendingDeletes.every(t => delSelectedIds.has(t.id))
+  const toggleDelAll   = () => allDelSelected
+    ? setDelSelectedIds(new Set())
+    : setDelSelectedIds(new Set(pendingDeletes.map(t => t.id)))
+  const toggleDelOne = (id) => setDelSelectedIds(prev => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const execDelAction = (action) => {
+    const ids = [...delSelectedIds]
+    if (action === 'approve') ids.forEach(id => approveDelete(id))
+    else ids.forEach(id => recoverTransaction(id))
+    setDelSelectedIds(new Set()); setDelConfirm(null)
+  }
+  const groupedDeletes = useMemo(() => {
+    const map = {}
+    pendingDeletes.forEach(t => {
+      const key = (t.deletedAt || t.date || '').slice(0, 10)
+      if (!map[key]) map[key] = []; map[key].push(t)
+    })
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
+  }, [pendingDeletes])
+
+  // ── Edit tab state ────────────────────────────────────────────────────────
+  const [editSelectedIds, setEditSelectedIds] = useState(new Set())
+  const [editConfirm, setEditConfirm]         = useState(null) // 'approve' | 'reject'
+
+  const allEditSelected = pendingEdits.length > 0 && pendingEdits.every(t => editSelectedIds.has(t.id))
+  const toggleEditAll   = () => allEditSelected
+    ? setEditSelectedIds(new Set())
+    : setEditSelectedIds(new Set(pendingEdits.map(t => t.id)))
+  const toggleEditOne = (id) => setEditSelectedIds(prev => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const execEditAction = (action) => {
+    const ids = [...editSelectedIds]
+    if (action === 'approve') {
+      ids.forEach(id => {
+        const txn = pendingEdits.find(t => t.id === id)
+        if (txn?.pendingEdit) approveEdit(id, txn.pendingEdit)
+      })
+    } else {
+      ids.forEach(id => rejectEdit(id))
+    }
+    setEditSelectedIds(new Set()); setEditConfirm(null)
+  }
+  const groupedEdits = useMemo(() => {
+    const map = {}
+    pendingEdits.forEach(t => {
+      const key = (t.pendingEdit?.requestedAt || t.date || '').slice(0, 10)
+      if (!map[key]) map[key] = []; map[key].push(t)
+    })
+    return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]))
+  }, [pendingEdits])
+
+  const EDIT_FIELDS = [
+    { key: 'date',        label: 'Date' },
+    { key: 'amount',      label: 'Amount', fmt: v => formatCurrency(v, cur) },
+    { key: 'description', label: 'Description' },
+    { key: 'category',    label: 'Category' },
+  ]
+
+  return (
+    <div className="p-4 space-y-4 max-w-2xl mx-auto">
+
+      {/* Sub-tab switcher */}
+      <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+        <button onClick={() => setSubTab('delete')}
+          className="flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all"
+          style={{ background: subTab === 'delete' ? '#EF4444' : 'transparent', color: subTab === 'delete' ? '#fff' : '#6B7280' }}>
+          🗑️ Delete Requests
+          {pendingDeletes.length > 0 && (
+            <span className="rounded-full px-1.5 py-0.5 text-xs font-black"
+              style={{ background: subTab === 'delete' ? 'rgba(255,255,255,0.25)' : '#FEE2E2', color: subTab === 'delete' ? '#fff' : '#EF4444' }}>
+              {pendingDeletes.length}
+            </span>
+          )}
+        </button>
+        <button onClick={() => setSubTab('edit')}
+          className="flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all"
+          style={{ background: subTab === 'edit' ? '#F59E0B' : 'transparent', color: subTab === 'edit' ? '#fff' : '#6B7280' }}>
+          ✏️ Edit Requests
+          {pendingEdits.length > 0 && (
+            <span className="rounded-full px-1.5 py-0.5 text-xs font-black"
+              style={{ background: subTab === 'edit' ? 'rgba(255,255,255,0.25)' : '#FEF3C7', color: subTab === 'edit' ? '#fff' : '#D97706' }}>
+              {pendingEdits.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── DELETE TAB ───────────────────────────────────────────────────────── */}
+      {subTab === 'delete' && (
+        pendingDeletes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+            <div className="w-16 h-16 rounded-3xl bg-green-50 flex items-center justify-center mb-4">
+              <span className="text-3xl">✅</span>
+            </div>
+            <p className="font-bold text-gray-700 text-base">No Pending Deletions</p>
+            <p className="text-gray-400 text-sm mt-1">All clear — nothing awaiting approval.</p>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#FEF2F2,#FFF1F2)', border: '1px solid #FECACA' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-rose-700">Pending Approval</p>
+                  <p className="text-3xl font-black text-rose-800 mt-0.5">{pendingDeletes.length}</p>
+                  <p className="text-xs text-rose-500 mt-0.5">{pendingDeletes.length === 1 ? 'entry' : 'entries'} marked for deletion</p>
+                </div>
+                <span className="text-5xl">🗑️</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={allDelSelected} onChange={toggleDelAll} className="w-4 h-4 accent-rose-500 cursor-pointer" />
+                <span className="text-xs font-semibold text-gray-600">Select All</span>
+                {delSelectedIds.size > 0 && <span className="text-xs text-gray-400">({delSelectedIds.size} selected)</span>}
+              </label>
+              {delSelectedIds.size > 0 && (
+                <div className="flex gap-2">
+                  <button onClick={() => setDelConfirm('recover')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+                    style={{ background: '#10B981' }}>↩ Restore ({delSelectedIds.size})</button>
+                  <button onClick={() => setDelConfirm('approve')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white"
+                    style={{ background: '#EF4444' }}>
+                    <Trash2 size={11} /> Delete Forever ({delSelectedIds.size})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {groupedDeletes.map(([date, txns]) => {
+                const today = new Date().toISOString().slice(0, 10)
+                const allDateSel = txns.every(t => delSelectedIds.has(t.id))
+                return (
+                  <div key={date}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <input type="checkbox" checked={allDateSel} className="w-4 h-4 accent-rose-400 cursor-pointer"
+                        onChange={() => setDelSelectedIds(prev => {
+                          const next = new Set(prev)
+                          if (allDateSel) txns.forEach(t => next.delete(t.id))
+                          else txns.forEach(t => next.add(t.id))
+                          return next
+                        })} />
+                      <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">
+                        Requested: {date === today ? 'Today' : date}
+                      </p>
+                      <div className="flex-1 h-px bg-rose-100" />
+                      <span className="text-xs text-rose-400 font-medium">{txns.length} item{txns.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {txns.map(t => {
+                        const inflow    = isInflow(t.type)
+                        const isSel     = delSelectedIds.has(t.id)
+                        const partner   = t.ownerId   ? owners.find(o => o.id === t.ownerId)
+                                        : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
+                        return (
+                          <div key={t.id} className="bg-white rounded-xl px-3 py-2.5 border flex items-center gap-2.5"
+                            style={{ borderColor: isSel ? '#F87171' : '#FEE2E2', background: isSel ? '#FFF5F5' : '#fff' }}>
+                            <input type="checkbox" checked={isSel} onChange={() => toggleDelOne(t.id)}
+                              className="w-4 h-4 flex-shrink-0 accent-rose-500 cursor-pointer" />
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#FEE2E2' }}>
+                              <span style={{ fontSize: 16 }}>🗑️</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-500 truncate text-xs line-through">{t.description || t.type?.replace(/_/g, ' ')}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className="text-gray-400" style={{ fontSize: 9 }}>{formatDate(t.date)}</span>
+                                {t.category && (
+                                  <span className="px-1.5 py-0.5 rounded-full font-semibold" style={{ background: '#F3F4F6', color: '#6B7280', fontSize: 9 }}>
+                                    {t.category.replace(/_/g, ' ')}
+                                  </span>
+                                )}
+                                <span className="px-1.5 py-0.5 rounded-full font-medium"
+                                  style={{ background: inflow ? '#ECFDF5' : '#FFF1F2', color: inflow ? '#059669' : '#E11D48', fontSize: 9 }}>
+                                  {inflow ? 'Credit' : 'Debit'}
+                                </span>
+                                {partner && (
+                                  <span className="px-1.5 py-0.5 rounded-full font-medium"
+                                    style={{ background: `${partner.color || '#3B82F6'}18`, color: partner.color || '#3B82F6', fontSize: 9 }}>
+                                    {partner.name.split(' ')[0]}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
+                              <p className="font-bold text-sm opacity-60" style={{ color: inflow ? '#059669' : '#E11D48' }}>
+                                {inflow ? '+' : '-'}{formatCurrency(t.amount, cur)}
+                              </p>
+                              <div className="flex gap-1">
+                                <button onClick={() => recoverTransaction(t.id)} className="px-2 py-1 rounded-lg font-bold text-white" style={{ background: '#10B981', fontSize: 10 }}>↩ Restore</button>
+                                <button onClick={() => approveDelete(t.id)} className="px-2 py-1 rounded-lg font-bold text-white" style={{ background: '#EF4444', fontSize: 10 }}>✓ Delete</button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {delConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ background: delConfirm === 'approve' ? '#FEF2F2' : '#ECFDF5' }}>
+                    {delConfirm === 'approve' ? <Trash2 size={22} color="#EF4444" /> : <span className="text-2xl">↩</span>}
+                  </div>
+                  <p className="font-bold text-gray-900 text-lg mb-1">
+                    {delConfirm === 'approve'
+                      ? `Permanently Delete ${delSelectedIds.size} ${delSelectedIds.size === 1 ? 'Entry' : 'Entries'}?`
+                      : `Restore ${delSelectedIds.size} ${delSelectedIds.size === 1 ? 'Entry' : 'Entries'}?`}
+                  </p>
+                  <p className="text-gray-500 text-sm mb-5">
+                    {delConfirm === 'approve'
+                      ? 'This cannot be undone. Selected entries will be permanently removed.'
+                      : 'Selected entries will be restored to the active ledger immediately.'}
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setDelConfirm(null)} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
+                    <button onClick={() => execDelAction(delConfirm)} className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                      style={{ background: delConfirm === 'approve' ? '#EF4444' : '#10B981' }}>
+                      {delConfirm === 'approve' ? 'Delete Forever' : 'Restore to Ledger'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )
+      )}
+
+      {/* ── EDIT TAB ─────────────────────────────────────────────────────────── */}
+      {subTab === 'edit' && (
+        pendingEdits.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+            <div className="w-16 h-16 rounded-3xl bg-green-50 flex items-center justify-center mb-4">
+              <span className="text-3xl">✅</span>
+            </div>
+            <p className="font-bold text-gray-700 text-base">No Pending Edits</p>
+            <p className="text-gray-400 text-sm mt-1">All clear — no changes awaiting review.</p>
+          </div>
+        ) : (
+          <>
+            <div className="rounded-2xl p-4" style={{ background: 'linear-gradient(135deg,#FEF3C7,#FFFBEB)', border: '1px solid #FDE68A' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-amber-700">Edit Review</p>
+                  <p className="text-3xl font-black text-amber-800 mt-0.5">{pendingEdits.length}</p>
+                  <p className="text-xs text-amber-600 mt-0.5">{pendingEdits.length === 1 ? 'edit request' : 'edit requests'} pending approval</p>
+                </div>
+                <span className="text-5xl">✏️</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={allEditSelected} onChange={toggleEditAll} className="w-4 h-4 accent-amber-500 cursor-pointer" />
+                <span className="text-xs font-semibold text-gray-600">Select All</span>
+                {editSelectedIds.size > 0 && <span className="text-xs text-gray-400">({editSelectedIds.size} selected)</span>}
+              </label>
+              {editSelectedIds.size > 0 && (
+                <div className="flex gap-2">
+                  <button onClick={() => setEditConfirm('reject')} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: '#6B7280' }}>
+                    ✗ Reject ({editSelectedIds.size})
+                  </button>
+                  <button onClick={() => setEditConfirm('approve')} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{ background: '#10B981' }}>
+                    ✓ Approve ({editSelectedIds.size})
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {groupedEdits.map(([date, txns]) => {
+                const today = new Date().toISOString().slice(0, 10)
+                return (
+                  <div key={date}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Requested: {date === today ? 'Today' : date}</p>
+                      <div className="flex-1 h-px bg-amber-100" />
+                      <span className="text-xs text-amber-500 font-medium">{txns.length} item{txns.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="space-y-3">
+                      {txns.map(t => {
+                        const pe  = t.pendingEdit || {}
+                        const isSel = editSelectedIds.has(t.id)
+                        return (
+                          <div key={t.id} className="bg-white rounded-2xl border overflow-hidden"
+                            style={{ borderColor: isSel ? '#F59E0B' : '#FDE68A' }}>
+                            {/* Card header */}
+                            <div className="flex items-center gap-2.5 px-3 py-2.5" style={{ background: isSel ? '#FFFBEB' : '#FFFDF0' }}>
+                              <input type="checkbox" checked={isSel} onChange={() => toggleEditOne(t.id)} className="w-4 h-4 flex-shrink-0 accent-amber-500 cursor-pointer" />
+                              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#FEF3C7' }}>
+                                <span style={{ fontSize: 14 }}>✏️</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-gray-800 text-xs truncate">{t.description || pe.description || '—'}</p>
+                                <p className="text-amber-600 font-semibold" style={{ fontSize: 9 }}>
+                                  {t.type?.replace(/_/g, ' ')} · {(pe.requestedAt || '').slice(0, 16).replace('T', ' ')}
+                                </p>
+                              </div>
+                              <div className="flex gap-1.5 flex-shrink-0">
+                                <button onClick={() => rejectEdit(t.id)} className="px-2.5 py-1 rounded-lg font-bold text-white" style={{ background: '#6B7280', fontSize: 10 }}>✗ Reject</button>
+                                <button onClick={() => approveEdit(t.id, pe)} className="px-2.5 py-1 rounded-lg font-bold text-white" style={{ background: '#10B981', fontSize: 10 }}>✓ Approve</button>
+                              </div>
+                            </div>
+                            {/* Old vs New grid */}
+                            <div className="grid grid-cols-2 divide-x divide-gray-100">
+                              <div className="p-3" style={{ background: '#FFF1F2' }}>
+                                <p className="text-xs font-black text-rose-600 uppercase tracking-wider mb-2">Old Data</p>
+                                {EDIT_FIELDS.map(({ key, label, fmt }) => {
+                                  const oldV = t[key]; const newV = pe[key]
+                                  if (oldV === undefined && newV === undefined) return null
+                                  const changed = newV !== undefined && String(oldV) !== String(newV)
+                                  return (
+                                    <div key={key} className="mb-1.5">
+                                      <p className="text-gray-400 uppercase tracking-wide" style={{ fontSize: 8 }}>{label}</p>
+                                      <p className={`text-xs font-semibold ${changed ? 'text-rose-700 line-through' : 'text-gray-700'}`}>
+                                        {oldV !== undefined ? (fmt ? fmt(oldV) : String(oldV)) : '—'}
+                                      </p>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              <div className="p-3" style={{ background: '#ECFDF5' }}>
+                                <p className="text-xs font-black text-emerald-600 uppercase tracking-wider mb-2">New Data</p>
+                                {EDIT_FIELDS.map(({ key, label, fmt }) => {
+                                  const oldV = t[key]; const newV = pe[key]
+                                  if (newV === undefined) return null
+                                  const changed = String(oldV) !== String(newV)
+                                  return (
+                                    <div key={key} className="mb-1.5">
+                                      <p className="text-gray-400 uppercase tracking-wide" style={{ fontSize: 8 }}>{label}</p>
+                                      <p className={`text-xs font-semibold ${changed ? 'text-emerald-700 font-black' : 'text-gray-700'}`}>
+                                        {fmt ? fmt(newV) : String(newV)}
+                                        {changed && <span className="ml-1 text-emerald-400" style={{ fontSize: 9 }}>← changed</span>}
+                                      </p>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {editConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ background: editConfirm === 'approve' ? '#ECFDF5' : '#F3F4F6' }}>
+                    <span className="text-2xl">{editConfirm === 'approve' ? '✓' : '✗'}</span>
+                  </div>
+                  <p className="font-bold text-gray-900 text-lg mb-1">
+                    {editConfirm === 'approve'
+                      ? `Approve ${editSelectedIds.size} Edit ${editSelectedIds.size === 1 ? 'Request' : 'Requests'}?`
+                      : `Reject ${editSelectedIds.size} Edit ${editSelectedIds.size === 1 ? 'Request' : 'Requests'}?`}
+                  </p>
+                  <p className="text-gray-500 text-sm mb-5">
+                    {editConfirm === 'approve'
+                      ? 'New data will overwrite the originals in the ledger.'
+                      : 'Edit requests will be discarded. Original entries remain unchanged.'}
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setEditConfirm(null)} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">Cancel</button>
+                    <button onClick={() => execEditAction(editConfirm)} className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
+                      style={{ background: editConfirm === 'approve' ? '#10B981' : '#6B7280' }}>
+                      {editConfirm === 'approve' ? 'Approve All' : 'Reject All'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )
       )}
     </div>
   )
@@ -875,7 +1902,8 @@ function MainApp() {
   }
 
   const isDepoTab   = tab === 'DEPO_ADVANCE' || tab === 'DEPO_SETTLE'
-  const activeLabel = [...NAV_MAIN, ...navExpense, ...NAV_DEPO].find(n => n.key === tab)?.label
+  const isAdminTab  = tab === 'DELETE_APPROVALS'
+  const activeLabel = [...NAV_MAIN, ...navExpense, ...NAV_DEPO, ...NAV_ADMIN].find(n => n.key === tab)?.label
 
   return (
     <div className="min-h-screen" style={{ background: '#F1F5F9' }}>
@@ -916,7 +1944,7 @@ function MainApp() {
           {/* Mobile-only horizontal tab scroll */}
           <div className="flex md:hidden overflow-x-auto gap-1.5 px-3 pb-2 scrollbar-none"
             style={{ scrollbarWidth: 'none' }}>
-            {[...NAV_MAIN, ...navExpense, ...NAV_DEPO].map(item => {
+            {[...NAV_MAIN, ...navExpense, ...NAV_DEPO, ...NAV_ADMIN].map(item => {
               const active = tab === item.key
               const color = catColorMap[item.key] || '#818CF8'
               return (
@@ -933,11 +1961,14 @@ function MainApp() {
           </div>
         </div>
 
+        {/* ── ADMIN VIEW ────────────────────────────────────────────────── */}
+        {isAdminTab && <DeleteApprovalsView settings={settings} />}
+
         {/* ── DEPO VIEW ─────────────────────────────────────────────────── */}
         {isDepoTab && <DepoView mode={tab === 'DEPO_ADVANCE' ? 'advance' : 'settle'} transactions={transactions} settings={settings} />}
 
         {/* ── CASH IN HAND BANNER ───────────────────────────────────────── */}
-        {tab !== 'STAFF' && !isDepoTab && (
+        {tab !== 'STAFF' && !isDepoTab && !isAdminTab && (
           <div className="mx-3 mt-3 rounded-lg px-3 py-2.5 flex items-center justify-between"
             style={{ background: '#1B5C20' }}>
             <div>
@@ -965,7 +1996,7 @@ function MainApp() {
         )}
 
         {/* ── ENTRY FORMS (tab-switch on mobile, side-by-side on desktop) ── */}
-        {tab !== 'STAFF' && !isDepoTab && (
+        {tab !== 'STAFF' && !isDepoTab && !isAdminTab && (
           <div className="mx-3 mt-2 mb-3">
             {/* Mobile form tab switcher */}
             <div className="flex md:hidden gap-1.5 mb-2">
@@ -1006,7 +2037,7 @@ function MainApp() {
         )}
 
         {/* ── SEARCH + DATE FILTER + PDF/PRINT ─────────────────────────── */}
-        {tab !== 'STAFF' && !isDepoTab && (<><div className="px-3 pt-2 pb-1">
+        {tab !== 'STAFF' && !isDepoTab && !isAdminTab && (<><div className="px-3 pt-2 pb-1">
           {/* Section label */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1 h-4 rounded" style={{ background: catColorMap[tab] || '#1B5C20' }} />
@@ -1473,6 +2504,8 @@ function MainApp() {
           onClose={() => setSelectedEmployee(null)}
         />
       )}
+
+
     </div>
   )
 }

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { X, Plus, Trash2, Pencil, User } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { OWNER_COLORS } from '../utils/helpers'
+import { OWNER_COLORS, TRANSACTION_TYPES, todayISO } from '../utils/helpers'
 
 const BLANK_EMP = { name: '', type: 'FIXED', salary: '' }
 
 export default function SettingsModal({ onClose }) {
-  const { owners, settings, employees = [], updateOwner, updateSettings, addEmployee, updateEmployee, deleteEmployee } = useApp()
+  const { owners, settings, employees = [], updateOwner, updateSettings, addEmployee, updateEmployee, deleteEmployee, addTransaction } = useApp()
 
   const [section, setSection]       = useState('company')
   const [companyName, setCompanyName] = useState(settings.companyName)
@@ -14,8 +14,9 @@ export default function SettingsModal({ onClose }) {
   const [saved, setSaved]           = useState(false)
 
   // employee form
-  const [empForm, setEmpForm]       = useState(null)   // null = closed, {} = new, {id} = edit
-  const [editingId, setEditingId]   = useState(null)
+  const [empForm, setEmpForm]         = useState(null)   // null = closed, {} = new, {id} = edit
+  const [editingId, setEditingId]     = useState(null)
+  const [varPayAmount, setVarPayAmount] = useState('')    // session payout for variable employees
 
   const setOwnerField = (id, field, value) =>
     setOwnerEdits(prev => prev.map(o => o.id === id ? { ...o, [field]: value } : o))
@@ -27,17 +28,39 @@ export default function SettingsModal({ onClose }) {
     setTimeout(() => { setSaved(false) }, 1500)
   }
 
-  const openNewEmp  = () => setEmpForm({ ...BLANK_EMP })
-  const openEditEmp = (e) => { setEmpForm({ ...e, salary: String(e.salary || '') }); setEditingId(e.id) }
-  const closeEmpForm = () => { setEmpForm(null); setEditingId(null) }
+  const openNewEmp  = () => { setEmpForm({ ...BLANK_EMP }); setVarPayAmount('') }
+  const openEditEmp = (e) => {
+    setEmpForm({ ...e, salary: String(e.salary || '') })
+    setEditingId(e.id)
+    setVarPayAmount('')
+  }
+  const closeEmpForm = () => { setEmpForm(null); setEditingId(null); setVarPayAmount('') }
 
   const saveEmployee = () => {
     if (!empForm.name.trim()) return
+    const base = { ...empForm, salary: parseFloat(empForm.salary) || 0 }
+
+    let empId = editingId
     if (editingId) {
-      updateEmployee({ ...empForm, id: editingId, salary: parseFloat(empForm.salary) || 0 })
+      updateEmployee({ ...base, id: editingId })
     } else {
-      addEmployee({ ...empForm, salary: parseFloat(empForm.salary) || 0 })
+      empId = addEmployee(base)
     }
+
+    const amt = parseFloat(varPayAmount)
+    if (empForm.type === 'VARIABLE' && amt > 0 && empId) {
+      addTransaction({
+        date: todayISO(),
+        amount: amt,
+        description: `Labour – ${empForm.name.trim()}`,
+        category: 'LABOUR',
+        type: TRANSACTION_TYPES.WAGE_ACCRUAL,
+        employeeId: empId,
+        ownerId: null, partnerId: null,
+        linkedCategories: ['LABOUR'],
+      })
+    }
+
     closeEmpForm()
   }
 
@@ -187,9 +210,9 @@ export default function SettingsModal({ onClose }) {
                         <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm flex-shrink-0">
                           {emp.name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-gray-900">{emp.name}</p>
-                          <p className="text-xs text-gray-400">Variable pay</p>
+                          <p className="text-xs text-orange-500 font-medium">Variable pay</p>
                         </div>
                         <button onClick={() => openEditEmp(emp)} className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500">
                           <Pencil size={14} />
@@ -252,6 +275,30 @@ export default function SettingsModal({ onClose }) {
                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-lg font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-200" />
                 </div>
               )}
+
+              {empForm.type === 'VARIABLE' && (
+                <>
+                  <div className="px-3 py-2 rounded-xl text-xs text-orange-700 font-medium leading-relaxed"
+                    style={{ background: '#FFF7ED', border: '1px solid #FED7AA' }}>
+                    Wages for this employee will be entered manually during monthly ledger processing.
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
+                      Amount (₹) — Optional: log wages now
+                    </label>
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-2xl border-2 transition-colors focus-within:border-orange-400"
+                      style={{ background: varPayAmount ? '#FFF7ED' : '#F9FAFB', borderColor: varPayAmount ? '#F97316' : '#E2E8F0' }}>
+                      <span className="font-bold select-none" style={{ color: varPayAmount ? '#F97316' : '#CBD5E1' }}>₹</span>
+                      <input type="number" min="0" step="any" placeholder="Enter exact amount"
+                        value={varPayAmount}
+                        onChange={e => setVarPayAmount(e.target.value)}
+                        className="flex-1 bg-transparent text-lg font-bold text-gray-900 focus:outline-none"
+                        style={{ border: 'none', outline: 'none' }} />
+                    </div>
+                  </div>
+                </>
+              )}
+
             </div>
 
             <div className="flex gap-3 mt-5">

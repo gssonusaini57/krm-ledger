@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import {
-  collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc
+  collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, deleteField
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { isInflow, TRANSACTION_TYPES } from '../utils/helpers'
@@ -25,6 +25,8 @@ export function AppProvider({ children }) {
   const [settings, setSettings]       = useState(DEFAULT_SETTINGS)
   const [employees, setEmployees]     = useState([])
   const [transactions, setTransactions] = useState([])
+  const [pendingDeletes, setPendingDeletes] = useState([])
+  const [pendingEdits, setPendingEdits]     = useState([])
   const [customCategories, setCustomCategories] = useState([])
   const [loading, setLoading]         = useState(true)
 
@@ -59,8 +61,19 @@ export function AppProvider({ children }) {
   useEffect(() => {
     const txnsRef = collection(db, 'transactions')
     const unsub = onSnapshot(txnsRef, (snap) => {
-      const txns = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      setTransactions(txns)
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      // Active: visible in ledger (includes pending_edit — they show an amber badge)
+      setTransactions(all.filter(t => t.status !== 'pending_delete'))
+      setPendingDeletes(
+        all
+          .filter(t => t.status === 'pending_delete')
+          .sort((a, b) => (b.deletedAt || '').localeCompare(a.deletedAt || ''))
+      )
+      setPendingEdits(
+        all
+          .filter(t => t.status === 'pending_edit')
+          .sort((a, b) => (b.pendingEdit?.requestedAt || '').localeCompare(a.pendingEdit?.requestedAt || ''))
+      )
       setLoading(false)
     })
     return () => unsub()
@@ -76,7 +89,62 @@ export function AppProvider({ children }) {
     updateDoc(doc(db, 'transactions', id), rest)
 
   const deleteTransaction = (id) =>
+    updateDoc(doc(db, 'transactions', id), {
+      status: 'pending_delete',
+      deletedAt: new Date().toISOString(),
+    })
+
+  const approveDelete = (id) =>
     deleteDoc(doc(db, 'transactions', id))
+
+  const recoverTransaction = (id) =>
+    updateDoc(doc(db, 'transactions', id), {
+      status: 'active',
+      deletedAt: deleteField(),
+    })
+
+  const requestEdit = (id, newData) =>
+    updateDoc(doc(db, 'transactions', id), {
+      status: 'pending_edit',
+      pendingEdit: { ...newData, requestedAt: new Date().toISOString() },
+    })
+
+  const approveEdit = (id, pendingEditData) => {
+    const { requestedAt, ...fields } = pendingEditData
+    return updateDoc(doc(db, 'transactions', id), {
+      ...fields,
+      status: 'active',
+      pendingEdit: deleteField(),
+    })
+  }
+
+  const rejectEdit = (id) =>
+    updateDoc(doc(db, 'transactions', id), {
+      status: 'active',
+      pendingEdit: deleteField(),
+    })
+
+  // Pay a pending wage accrual: creates real EXPENSE transaction + marks accrual settled
+  const settleWageAccrual = async (accrual, payDate, payMode) => {
+    const payRef = await addDoc(collection(db, 'transactions'), {
+      date: payDate,
+      amount: accrual.amount,
+      description: `Paid: ${accrual.description || `Wages – Employee`}`,
+      category: accrual.category || 'LABOUR',
+      type: TRANSACTION_TYPES.EXPENSE,
+      paymentMode: payMode,
+      employeeId: accrual.employeeId,
+      ownerId: null, partnerId: null,
+      linkedCategories: [accrual.category || 'LABOUR'],
+      wageAccrualId: accrual.id,
+      createdAt: new Date().toISOString(),
+    })
+    await updateDoc(doc(db, 'transactions', accrual.id), {
+      settledAt: new Date().toISOString(),
+      paymentTransactionId: payRef.id,
+      settledPaymentMode: payMode,
+    })
+  }
 
   const updateOwner = (owner) => {
     const newOwners = owners.map(o => o.id === owner.id ? owner : o)
@@ -91,9 +159,11 @@ export function AppProvider({ children }) {
   }
 
   const addEmployee = (emp) => {
-    const newEmps = [...employees, { ...emp, id: uuidv4() }]
+    const id = uuidv4()
+    const newEmps = [...employees, { ...emp, id }]
     setEmployees(newEmps)
     updateConfig({ employees: newEmps })
+    return id
   }
 
   const updateEmployee = (emp) => {
@@ -127,6 +197,8 @@ export function AppProvider({ children }) {
       if (t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN) return bal
       // Depo expenses are real spend — reduce total assets
       if (t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE) return bal - t.amount
+      // Wage accruals are payable liabilities — cash only moves when actually paid
+      if (t.type === TRANSACTION_TYPES.WAGE_ACCRUAL) return bal
       return bal + (isInflow(t.type) ? t.amount : -t.amount)
     }, opening)
   }
@@ -177,8 +249,9 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      owners, transactions, employees, settings, customCategories,
-      addTransaction, updateTransaction, deleteTransaction,
+      owners, transactions, pendingDeletes, pendingEdits, employees, settings, customCategories,
+      addTransaction, updateTransaction, deleteTransaction, approveDelete, recoverTransaction,
+      requestEdit, approveEdit, rejectEdit, settleWageAccrual,
       updateOwner, updateSettings,
       addEmployee, updateEmployee, deleteEmployee,
       addCustomCategory, deleteCustomCategory,

@@ -199,6 +199,8 @@ export function AppProvider({ children }) {
       if (t.type === TRANSACTION_TYPES.ADVANCE_EXPENSE) return bal - t.amount
       // Wage accruals are payable liabilities — cash only moves when actually paid
       if (t.type === TRANSACTION_TYPES.WAGE_ACCRUAL) return bal
+      // Cash → Bank is an internal transfer — total company assets unchanged
+      if (t.type === TRANSACTION_TYPES.CASH_TO_BANK) return bal
       return bal + (isInflow(t.type) ? t.amount : -t.amount)
     }, opening)
   }

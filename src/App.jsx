@@ -200,7 +200,7 @@ const hasLinked = (t, val) =>
   t.linkedCategory === val ||
   (Array.isArray(t.linkedCategories) && t.linkedCategories.includes(val))
 
-const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || hasLinked(t, 'BANK')
+const isBankTxn = (t) => t.paymentMode === 'ONLINE' || t.category === 'BANK' || hasLinked(t, 'BANK') || t.type === 'CASH_TO_BANK'
 
 // ── Right Report Panel ───────────────────────────────────────────────────────
 function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer = false }) {
@@ -1705,6 +1705,8 @@ function MainApp() {
 
   const cashInHand = useMemo(() =>
     transactions.reduce((sum, t) => {
+      // Cash → Bank deposit moves cash OUT of galla into bank
+      if (t.type === TRANSACTION_TYPES.CASH_TO_BANK) return sum - t.amount
       if (!isCashTxn(t)) return sum
       if (t.type === TRANSACTION_TYPES.CASH_IN || t.type === TRANSACTION_TYPES.OWNER_DEPOSIT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN) return sum + t.amount
       if (t.type === TRANSACTION_TYPES.EXPENSE  || t.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL || t.type === TRANSACTION_TYPES.ADVANCE_OUT) return sum - t.amount
@@ -1806,7 +1808,11 @@ function MainApp() {
 
   // Bank statement: running balance over all bank transactions (unfiltered, for the banner)
   const bankBalance = useMemo(() =>
-    transactions.filter(isBankTxn).reduce((s, t) => s + (isInflow(t.type) ? t.amount : -t.amount), 0),
+    transactions.filter(isBankTxn).reduce((s, t) => {
+      // CASH_TO_BANK is an inflow to bank
+      if (t.type === TRANSACTION_TYPES.CASH_TO_BANK) return s + t.amount
+      return s + (isInflow(t.type) ? t.amount : -t.amount)
+    }, 0),
     [transactions]
   )
   // Bank statement rows: filtered bank transactions with per-row running balance
@@ -2175,7 +2181,7 @@ function MainApp() {
                   </thead>
                   <tbody>
                     {bankStatement.map((t, idx) => {
-                      const inflow  = isInflow(t.type)
+                      const inflow  = isInflow(t.type) || t.type === TRANSACTION_TYPES.CASH_TO_BANK
                       const partner = t.ownerId   ? owners.find(o => o.id === t.ownerId)
                                     : t.partnerId ? owners.find(o => o.id === t.partnerId) : null
                       const isEven  = idx % 2 === 0
@@ -2306,10 +2312,10 @@ function MainApp() {
                 <div className="flex-1 h-px bg-gray-200" />
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
                   style={{
-                    background: txns.reduce((s,t) => s+(isInflow(t.type)?t.amount:-t.amount),0) >= 0 ? '#ECFDF5' : '#FFF1F2',
-                    color:      txns.reduce((s,t) => s+(isInflow(t.type)?t.amount:-t.amount),0) >= 0 ? '#059669' : '#E11D48',
+                    background: txns.reduce((s,t) => t.type===TRANSACTION_TYPES.CASH_TO_BANK?s:s+(isInflow(t.type)?t.amount:-t.amount),0) >= 0 ? '#ECFDF5' : '#FFF1F2',
+                    color:      txns.reduce((s,t) => t.type===TRANSACTION_TYPES.CASH_TO_BANK?s:s+(isInflow(t.type)?t.amount:-t.amount),0) >= 0 ? '#059669' : '#E11D48',
                   }}>
-                  {formatCurrency(txns.reduce((s,t) => s+(isInflow(t.type)?t.amount:-t.amount),0), settings.currency)}
+                  {formatCurrency(txns.reduce((s,t) => t.type===TRANSACTION_TYPES.CASH_TO_BANK?s:s+(isInflow(t.type)?t.amount:-t.amount),0), settings.currency)}
                 </span>
                 <button onClick={() => handleDayPrint(date, txns)}
                   className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
@@ -2320,6 +2326,7 @@ function MainApp() {
 
               <div className="space-y-1.5">
                 {txns.map(t => {
+                  const isBankDeposit = t.type === TRANSACTION_TYPES.CASH_TO_BANK
                   const inflow   = isInflow(t.type) || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
                   const isTransfer = t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
                   const partner  = t.ownerId   ? owners.find(o => o.id === t.ownerId)
@@ -2328,7 +2335,7 @@ function MainApp() {
                   return (
                     <div key={t.id}
                       className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5 transition-all"
-                      style={{ borderColor: selectedIds.has(t.id) ? '#F43F5E' : '#F1F5F9', background: selectedIds.has(t.id) ? '#FFF8F8' : '#fff' }}>
+                      style={{ borderColor: selectedIds.has(t.id) ? '#F43F5E' : isBankDeposit ? '#BFDBFE' : '#F1F5F9', background: selectedIds.has(t.id) ? '#FFF8F8' : isBankDeposit ? '#EFF6FF' : '#fff' }}>
                       <input
                         type="checkbox"
                         checked={selectedIds.has(t.id)}
@@ -2340,22 +2347,30 @@ function MainApp() {
                         className="w-4 h-4 flex-shrink-0 accent-rose-500 cursor-pointer"
                       />
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: inflow ? '#ECFDF5' : '#FFF1F2' }}>
-                        {inflow
-                          ? <ArrowUpRight size={16} color="#10B981" />
-                          : <ArrowDownRight size={16} color="#F43F5E" />
+                        style={{ background: isBankDeposit ? '#DBEAFE' : inflow ? '#ECFDF5' : '#FFF1F2' }}>
+                        {isBankDeposit
+                          ? <span style={{ fontSize: 16 }}>🏦</span>
+                          : inflow
+                            ? <ArrowUpRight size={16} color="#10B981" />
+                            : <ArrowDownRight size={16} color="#F43F5E" />
                         }
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 truncate text-xs">{t.description}</p>
                         <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                          {isBankDeposit && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{ background: '#DBEAFE', color: '#1D4ED8', fontSize: 9 }}>
+                              🏦 Cash → Bank
+                            </span>
+                          )}
                           {isTransfer && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: '#FEF3C7', color: '#92400E', fontSize: 9 }}>
                               🏭 Depo Transfer
                             </span>
                           )}
-                          {t.category && !isTransfer && (
+                          {t.category && !isTransfer && !isBankDeposit && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: `${catColor}18`, color: catColor, fontSize: 9 }}>
                               {getLabel(t.category)}
@@ -2382,8 +2397,8 @@ function MainApp() {
                         </div>
                       </div>
                       <div className="flex-shrink-0 text-right">
-                        <p className="font-bold text-sm" style={{ color: inflow ? '#10B981' : '#F43F5E' }}>
-                          {inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
+                        <p className="font-bold text-sm" style={{ color: isBankDeposit ? '#1D4ED8' : inflow ? '#10B981' : '#F43F5E' }}>
+                          {isBankDeposit ? '→' : inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
                         </p>
                         <div className="flex gap-1 mt-1 justify-end">
                           <button onClick={() => { setEditData(t); setShowEditForm(true) }}

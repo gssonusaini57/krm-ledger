@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO } from '../utils/helpers'
+import { TRANSACTION_TYPES, INCOME_CATEGORIES, EXPENSE_CATEGORIES, todayISO, PAYMENT_MODES } from '../utils/helpers'
 import DateInput from './DateInput'
 import CategoryModal from './CategoryModal'
 
 const MODES = [
-  { key: 'IN',    label: '💰 Credit'   },
-  { key: 'OUT',   label: '💸 Debit'    },
-  { key: 'OWNER', label: '👤 Partner'  },
+  { key: 'IN',       label: '💰 Credit'    },
+  { key: 'OUT',      label: '💸 Debit'     },
+  { key: 'OWNER',    label: '👤 Partner'   },
+  { key: 'TRANSFER', label: '🏦 Transfer'  },
 ]
 
 export default function TransactionForm({ onClose, editData = null, defaultTab = 'IN', defaultCategory = '' }) {
@@ -78,6 +79,9 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
       const type = ownerAction === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
       addTransaction({ date, amount: amt, description, category: '', type, paymentMode: '', ownerId })
     }
+    if (tab === 'TRANSFER') {
+      addTransaction({ date, amount: amt, description: description || 'Cash deposited to bank', category: 'BANK', type: TRANSACTION_TYPES.CASH_TO_BANK, paymentMode: 'ONLINE', ownerId: null, partnerId: null })
+    }
     onClose()
   }
 
@@ -139,7 +143,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
           </div>
 
           {/* Category */}
-          {(tab === 'IN' || tab === 'OUT') && (
+          {(tab === 'IN' || tab === 'OUT') && !editData && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Category</label>
               <select
@@ -165,7 +169,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
           {showCatModal && <CategoryModal onClose={() => setShowCatModal(false)} />}
 
           {/* Link to Partner — optional for Credit/Debit */}
-          {(tab === 'IN' || tab === 'OUT') && (
+          {(tab === 'IN' || tab === 'OUT') && !editData && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Link to Partner</label>
               <select value={partnerId} onChange={e => setPartnerId(e.target.value)}
@@ -292,6 +296,30 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
                 ))}
               </div>
             </>
+          )}
+
+          {/* Transfer tab — Cash → Bank */}
+          {tab === 'TRANSFER' && (
+            <div className="rounded-2xl border-2 p-4 space-y-3" style={{ borderColor: '#3B82F6', background: '#EFF6FF' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style={{ background: '#DBEAFE' }}>💵</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-0.5 bg-blue-400" />
+                  <span className="text-lg">→</span>
+                  <div className="w-6 h-0.5 bg-blue-400" />
+                </div>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl" style={{ background: '#DBEAFE' }}>🏦</div>
+                <div>
+                  <p className="text-sm font-bold text-blue-800">Cash → Bank (Deposit)</p>
+                  <p className="text-xs text-blue-500">Galle se Bank mein deposit</p>
+                </div>
+              </div>
+              <div className="bg-blue-50 rounded-xl px-3 py-2.5 text-xs text-blue-700 font-medium space-y-1">
+                <p>✓ Cash in Hand (Galla) will <strong>decrease</strong> by this amount</p>
+                <p>✓ Bank Balance will <strong>increase</strong> by this amount</p>
+                <p>✓ Total company assets remain unchanged (internal transfer)</p>
+              </div>
+            </div>
           )}
 
           {error && (

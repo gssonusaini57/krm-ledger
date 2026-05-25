@@ -9,6 +9,7 @@ export const TRANSACTION_TYPES = {
   ADVANCE_EXPENSE: 'ADVANCE_EXPENSE', // Munim account → Depo expense (Stage 2)
   ADVANCE_RETURN: 'ADVANCE_RETURN',   // Munim → Main Cash (Stage 3)
   WAGE_ACCRUAL: 'WAGE_ACCRUAL',       // Wages earned but not yet paid (accrued liability)
+  CASH_TO_BANK: 'CASH_TO_BANK',       // Cash deposited into bank (internal transfer)
 }
 
 export const TYPE_LABELS = {
@@ -20,6 +21,7 @@ export const TYPE_LABELS = {
   ADVANCE_EXPENSE: 'Depo Expense',
   ADVANCE_RETURN: 'Advance Returned',
   WAGE_ACCRUAL: 'Wages Due (Payable)',
+  CASH_TO_BANK: 'Cash → Bank (Deposit)',
 }
 
 export const INCOME_CATEGORIES = [
@@ -123,6 +125,8 @@ export function isOutflow(type) {
 }
 
 export function transactionEffect(transaction) {
+  // CASH_TO_BANK is an inflow to bank (treated as positive in bank running balance)
+  if (transaction.type === TRANSACTION_TYPES.CASH_TO_BANK) return transaction.amount
   return isInflow(transaction.type) ? transaction.amount : -transaction.amount
 }
 

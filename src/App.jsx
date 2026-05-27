@@ -1681,7 +1681,14 @@ function DeleteApprovalsView({ settings }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 function MainApp() {
-  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction, getMunimBalance, customCategories = [] } = useApp()
+  const { transactions, owners, employees = [], settings, getCompanyBalance, getOwnerBalance, deleteTransaction, approveDelete, getMunimBalance, customCategories = [] } = useApp()
+
+  // Only these types can be meaningfully edited via TransactionForm
+  const EDITABLE_TYPES = new Set([
+    TRANSACTION_TYPES.CASH_IN, TRANSACTION_TYPES.EXPENSE,
+    TRANSACTION_TYPES.OWNER_DEPOSIT, TRANSACTION_TYPES.OWNER_WITHDRAWAL,
+    TRANSACTION_TYPES.CASH_TO_BANK,
+  ])
 
   const [tab, setTab]               = useState('ALL')
   const [search, setSearch]         = useState('')
@@ -2218,11 +2225,13 @@ function MainApp() {
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex gap-1 justify-end">
-                              <button onClick={() => { setEditData(t); setShowEditForm(true) }}
-                                className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
-                                <Pencil size={10} />
-                              </button>
-                              <button onClick={() => setConfirmDel(t.id)}
+                              {EDITABLE_TYPES.has(t.type) && (
+                                <button onClick={() => { setEditData(t); setShowEditForm(true) }}
+                                  className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+                                  <Pencil size={10} />
+                                </button>
+                              )}
+                              <button onClick={() => setConfirmDel(t)}
                                 className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
                                 <Trash2 size={10} />
                               </button>
@@ -2401,11 +2410,13 @@ function MainApp() {
                           {isBankDeposit ? '→' : inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
                         </p>
                         <div className="flex gap-1 mt-1 justify-end">
-                          <button onClick={() => { setEditData(t); setShowEditForm(true) }}
-                            className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
-                            <Pencil size={10} />
-                          </button>
-                          <button onClick={() => setConfirmDel(t.id)}
+                          {EDITABLE_TYPES.has(t.type) && (
+                            <button onClick={() => { setEditData(t); setShowEditForm(true) }}
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+                              <Pencil size={10} />
+                            </button>
+                          )}
+                          <button onClick={() => setConfirmDel(t)}
                             className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
                             <Trash2 size={10} />
                           </button>
@@ -2459,7 +2470,7 @@ function MainApp() {
                 Cancel
               </button>
               <button onClick={() => {
-                selectedIds.forEach(id => deleteTransaction(id))
+                selectedIds.forEach(id => approveDelete(id))
                 setSelectedIds(new Set()); setConfirmBulkDel(false)
               }}
                 className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
@@ -2479,16 +2490,18 @@ function MainApp() {
               <Trash2 size={22} color="#F43F5E" />
             </div>
             <p className="font-bold text-gray-900 text-lg mb-1">Delete Entry?</p>
-            <p className="text-gray-400 text-sm mb-5">This cannot be undone.</p>
+            <p className="text-gray-700 text-sm mb-0.5 truncate font-medium">{confirmDel.description || '—'}</p>
+            <p className="font-bold text-rose-500 text-base mb-4">{formatCurrency(confirmDel.amount, settings.currency)} · {formatDate(confirmDel.date)}</p>
+            <p className="text-gray-400 text-xs mb-5">This permanently removes the entry from the ledger and cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDel(null)}
                 className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-semibold text-gray-600">
                 Cancel
               </button>
-              <button onClick={() => { deleteTransaction(confirmDel); setConfirmDel(null) }}
+              <button onClick={() => { approveDelete(confirmDel.id); setConfirmDel(null) }}
                 className="flex-1 py-3 rounded-2xl text-sm font-bold text-white"
                 style={{ background: '#F43F5E' }}>
-                Delete
+                Delete Forever
               </button>
             </div>
           </div>

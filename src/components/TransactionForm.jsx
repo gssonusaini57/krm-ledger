@@ -30,9 +30,12 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
 
   useEffect(() => {
     if (!editData) return
-    if (editData.type === TRANSACTION_TYPES.CASH_IN)              setTab('IN')
-    else if (editData.type === TRANSACTION_TYPES.EXPENSE)         setTab('OUT')
-    else                                                           setTab('OWNER')
+    if (editData.type === TRANSACTION_TYPES.CASH_IN)                                             setTab('IN')
+    else if (editData.type === TRANSACTION_TYPES.EXPENSE)                                        setTab('OUT')
+    else if (editData.type === TRANSACTION_TYPES.CASH_TO_BANK)                                   setTab('TRANSFER')
+    else if (editData.type === TRANSACTION_TYPES.OWNER_DEPOSIT ||
+             editData.type === TRANSACTION_TYPES.OWNER_WITHDRAWAL)                               setTab('OWNER')
+    else                                                                                         setTab('IN')
     setAmount(String(editData.amount))
     setDesc(editData.description || '')
     setCategory(editData.category || '')
@@ -56,9 +59,18 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
 
     if (editData) {
       let type = TRANSACTION_TYPES.CASH_IN
-      if (tab === 'OUT')   type = TRANSACTION_TYPES.EXPENSE
-      if (tab === 'OWNER') type = ownerAction === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
-      updateTransaction({ ...editData, date, amount: amt, description, category, paymentMode: tab === 'OUT' ? paymentMode : '', type, ownerId: tab === 'OWNER' ? ownerId : null, partnerId: (tab === 'IN' || tab === 'OUT') ? (partnerId || null) : null })
+      if (tab === 'OUT')      type = TRANSACTION_TYPES.EXPENSE
+      if (tab === 'OWNER')    type = ownerAction === 'DEPOSIT' ? TRANSACTION_TYPES.OWNER_DEPOSIT : TRANSACTION_TYPES.OWNER_WITHDRAWAL
+      if (tab === 'TRANSFER') type = TRANSACTION_TYPES.CASH_TO_BANK
+      // strip computed display fields (runningBalance from bank statement view) before writing to Firestore
+      const { runningBalance: _rb, ...cleanEdit } = editData
+      updateTransaction({
+        ...cleanEdit, date, amount: amt, description, category,
+        paymentMode: tab === 'OUT' ? paymentMode : tab === 'TRANSFER' ? 'ONLINE' : '',
+        type,
+        ownerId: tab === 'OWNER' ? ownerId : null,
+        partnerId: (tab === 'IN' || tab === 'OUT') ? (partnerId || null) : null,
+      })
       return onClose()
     }
 
@@ -143,7 +155,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
           </div>
 
           {/* Category */}
-          {(tab === 'IN' || tab === 'OUT') && !editData && (
+          {(tab === 'IN' || tab === 'OUT') && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Category</label>
               <select
@@ -336,7 +348,7 @@ export default function TransactionForm({ onClose, editData = null, defaultTab =
             <button type="submit"
               className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-white transition-all active:scale-95"
               style={{ background: 'linear-gradient(135deg, #3B82F6, #6366F1)', boxShadow: '0 4px 16px rgba(99,102,241,0.3)' }}>
-              Save Entry
+              {editData ? 'Update Entry' : 'Save Entry'}
             </button>
           </div>
         </form>

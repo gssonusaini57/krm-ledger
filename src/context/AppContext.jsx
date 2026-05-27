@@ -184,6 +184,12 @@ export function AppProvider({ children }) {
     updateConfig({ customCategories: newCats })
   }
 
+  const updateCustomCategory = (cat) => {
+    const newCats = customCategories.map(c => c.id === cat.id ? { ...c, ...cat } : c)
+    setCustomCategories(newCats)
+    updateConfig({ customCategories: newCats })
+  }
+
   const deleteCustomCategory = (id) => {
     const newCats = customCategories.filter(c => c.id !== id)
     setCustomCategories(newCats)
@@ -256,7 +262,7 @@ export function AppProvider({ children }) {
       requestEdit, approveEdit, rejectEdit, settleWageAccrual,
       updateOwner, updateSettings,
       addEmployee, updateEmployee, deleteEmployee,
-      addCustomCategory, deleteCustomCategory,
+      addCustomCategory, updateCustomCategory, deleteCustomCategory,
       getCompanyBalance, getOwnerBalance, getOwnerTransactions, getTotals, getMunimBalance,
     }}>
       {children}

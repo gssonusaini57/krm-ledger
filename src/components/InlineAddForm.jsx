@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
+import { Settings } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { TRANSACTION_TYPES, todayISO } from '../utils/helpers'
 import DateInput from './DateInput'
 import CategoryModal from './CategoryModal'
+import ManageCategoriesModal from './ManageCategoriesModal'
 
 const CATEGORY_CHIPS = [
   { value: 'SALARY',       label: 'Salary'     },
@@ -51,7 +53,8 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
   const [error, setError]           = useState('')
   const [success, setSuccess]       = useState(false)
   const [lastAction, setLastAction] = useState('')
-  const [showCatModal, setShowCatModal] = useState(false)
+  const [showCatModal,    setShowCatModal]    = useState(false)
+  const [showManageModal, setShowManageModal] = useState(false)
 
   const reset = () => {
     setAmount(''); setDesc(''); setError(''); setEmpId('')
@@ -181,9 +184,18 @@ export default function InlineAddForm({ defaultCategory = '', currentTab = '' })
               style={{ borderColor: '#6366F1', background: '#fff', color: '#6366F1', borderStyle: 'dashed' }}>
               + New
             </button>
+            <button
+              type="button"
+              onClick={() => setShowManageModal(true)}
+              className="h-[26px] px-1.5 rounded flex items-center gap-1 border-2 text-xs font-semibold transition-all"
+              style={{ borderColor: '#E2E8F0', background: '#F8FAFC', color: '#94A3B8' }}
+              title="Manage Categories — Rename or delete custom shortcuts">
+              <Settings size={10} />
+            </button>
           </div>
 
-          {showCatModal && <CategoryModal onClose={() => setShowCatModal(false)} />}
+          {showCatModal    && <CategoryModal       onClose={() => setShowCatModal(false)}    />}
+          {showManageModal && <ManageCategoriesModal onClose={() => setShowManageModal(false)} />}
 
           {/* Employee quick-pick */}
           {hasSalaryLabour && (() => {

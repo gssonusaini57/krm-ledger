@@ -10,6 +10,7 @@ export const TRANSACTION_TYPES = {
   ADVANCE_RETURN: 'ADVANCE_RETURN',   // Munim → Main Cash (Stage 3)
   WAGE_ACCRUAL: 'WAGE_ACCRUAL',       // Wages earned but not yet paid (accrued liability)
   CASH_TO_BANK: 'CASH_TO_BANK',       // Cash deposited into bank (internal transfer)
+  BANK_TO_MILL: 'BANK_TO_MILL',       // Bank pays a mill expense (bank decreases, cash unchanged)
 }
 
 export const TYPE_LABELS = {
@@ -22,6 +23,7 @@ export const TYPE_LABELS = {
   ADVANCE_RETURN: 'Advance Returned',
   WAGE_ACCRUAL: 'Wages Due (Payable)',
   CASH_TO_BANK: 'Cash → Bank (Deposit)',
+  BANK_TO_MILL: 'Bank → Mill (Expense)',
 }
 
 export const INCOME_CATEGORIES = [

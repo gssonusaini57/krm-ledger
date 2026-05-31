@@ -207,7 +207,7 @@ function ReportPanel({ owners, transactions, settings, onPartnerClick, isDrawer 
 
   const { bankIn, bankOut } = useMemo(() => ({
     bankIn:  transactions.filter(t => (t.type === 'CASH_IN' || t.type === 'OWNER_DEPOSIT')    && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
-    bankOut: transactions.filter(t => (t.type === 'EXPENSE' || t.type === 'OWNER_WITHDRAWAL') && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
+    bankOut: transactions.filter(t => (t.type === 'EXPENSE' || t.type === 'OWNER_WITHDRAWAL' || t.type === 'BANK_TO_MILL') && isBankTxn(t)).reduce((s, t) => s + t.amount, 0),
   }), [transactions])
 
   const partnerStats = useMemo(() =>
@@ -1687,7 +1687,7 @@ function MainApp() {
   const EDITABLE_TYPES = new Set([
     TRANSACTION_TYPES.CASH_IN, TRANSACTION_TYPES.EXPENSE,
     TRANSACTION_TYPES.OWNER_DEPOSIT, TRANSACTION_TYPES.OWNER_WITHDRAWAL,
-    TRANSACTION_TYPES.CASH_TO_BANK,
+    TRANSACTION_TYPES.CASH_TO_BANK, TRANSACTION_TYPES.BANK_TO_MILL,
   ])
 
   const [tab, setTab]               = useState('ALL')
@@ -2335,7 +2335,8 @@ function MainApp() {
 
               <div className="space-y-1.5">
                 {txns.map(t => {
-                  const isBankDeposit = t.type === TRANSACTION_TYPES.CASH_TO_BANK
+                  const isBankDeposit    = t.type === TRANSACTION_TYPES.CASH_TO_BANK
+                  const isBankMillExpense = t.type === TRANSACTION_TYPES.BANK_TO_MILL
                   const inflow   = isInflow(t.type) || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
                   const isTransfer = t.type === TRANSACTION_TYPES.ADVANCE_OUT || t.type === TRANSACTION_TYPES.ADVANCE_RETURN
                   const partner  = t.ownerId   ? owners.find(o => o.id === t.ownerId)
@@ -2344,7 +2345,7 @@ function MainApp() {
                   return (
                     <div key={t.id}
                       className="bg-white rounded-xl px-3 py-2.5 shadow-sm border flex items-center gap-2.5 transition-all"
-                      style={{ borderColor: selectedIds.has(t.id) ? '#F43F5E' : isBankDeposit ? '#BFDBFE' : '#F1F5F9', background: selectedIds.has(t.id) ? '#FFF8F8' : isBankDeposit ? '#EFF6FF' : '#fff' }}>
+                      style={{ borderColor: selectedIds.has(t.id) ? '#F43F5E' : isBankDeposit ? '#BFDBFE' : isBankMillExpense ? '#FECACA' : '#F1F5F9', background: selectedIds.has(t.id) ? '#FFF8F8' : isBankDeposit ? '#EFF6FF' : isBankMillExpense ? '#FFF1F2' : '#fff' }}>
                       <input
                         type="checkbox"
                         checked={selectedIds.has(t.id)}
@@ -2356,12 +2357,14 @@ function MainApp() {
                         className="w-4 h-4 flex-shrink-0 accent-rose-500 cursor-pointer"
                       />
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: isBankDeposit ? '#DBEAFE' : inflow ? '#ECFDF5' : '#FFF1F2' }}>
+                        style={{ background: isBankDeposit ? '#DBEAFE' : isBankMillExpense ? '#FEE2E2' : inflow ? '#ECFDF5' : '#FFF1F2' }}>
                         {isBankDeposit
                           ? <span style={{ fontSize: 16 }}>🏦</span>
-                          : inflow
-                            ? <ArrowUpRight size={16} color="#10B981" />
-                            : <ArrowDownRight size={16} color="#F43F5E" />
+                          : isBankMillExpense
+                            ? <span style={{ fontSize: 16 }}>🏦</span>
+                            : inflow
+                              ? <ArrowUpRight size={16} color="#10B981" />
+                              : <ArrowDownRight size={16} color="#F43F5E" />
                         }
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2373,13 +2376,19 @@ function MainApp() {
                               🏦 Cash → Bank
                             </span>
                           )}
+                          {isBankMillExpense && (
+                            <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+                              style={{ background: '#FEE2E2', color: '#DC2626', fontSize: 9 }}>
+                              🏦 Bank → Mill
+                            </span>
+                          )}
                           {isTransfer && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: '#FEF3C7', color: '#92400E', fontSize: 9 }}>
                               🏭 Depo Transfer
                             </span>
                           )}
-                          {t.category && !isTransfer && !isBankDeposit && (
+                          {t.category && !isTransfer && !isBankDeposit && !isBankMillExpense && (
                             <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
                               style={{ background: `${catColor}18`, color: catColor, fontSize: 9 }}>
                               {getLabel(t.category)}
@@ -2406,8 +2415,8 @@ function MainApp() {
                         </div>
                       </div>
                       <div className="flex-shrink-0 text-right">
-                        <p className="font-bold text-sm" style={{ color: isBankDeposit ? '#1D4ED8' : inflow ? '#10B981' : '#F43F5E' }}>
-                          {isBankDeposit ? '→' : inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
+                        <p className="font-bold text-sm" style={{ color: isBankDeposit ? '#1D4ED8' : isBankMillExpense ? '#DC2626' : inflow ? '#10B981' : '#F43F5E' }}>
+                          {isBankDeposit ? '→' : isBankMillExpense ? '-' : inflow ? '+' : '-'}{formatCurrency(t.amount, settings.currency)}
                         </p>
                         <div className="flex gap-1 mt-1 justify-end">
                           {EDITABLE_TYPES.has(t.type) && (

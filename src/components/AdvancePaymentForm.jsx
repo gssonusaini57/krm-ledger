@@ -13,6 +13,7 @@ const MODES = [
   { value: 'BANK_TO_P',    label: 'Bank → P (Payment)',        hint: 'Bank pays partner'            },
   { value: 'BANK_TO_CASH', label: 'Bank → Cash (Withdrawal)',  hint: 'Withdraw cash from bank'      },
   { value: 'CASH_TO_BANK', label: '🏦 Cash → Bank (Deposit)', hint: 'Deposit cash from galla into bank' },
+  { value: 'BANK_TO_MILL', label: '🏦 Bank → Mill (Expense)', hint: 'Pay a mill expense directly from bank' },
 ]
 
 const CATEGORY_CHIPS = [
@@ -52,8 +53,8 @@ export default function AdvancePaymentForm() {
 
   const partner  = owners.find(o => o.id === partnerId)
 
-  const needsPartner  = mode !== 'BANK_TO_CASH' && mode !== 'CASH_TO_BANK'
-  const needsCategory = mode === 'P_TO_RM'
+  const needsPartner  = mode !== 'BANK_TO_CASH' && mode !== 'CASH_TO_BANK' && mode !== 'BANK_TO_MILL'
+  const needsCategory = mode === 'P_TO_RM' || mode === 'BANK_TO_MILL'
   const hasSalaryLabour = needsCategory && (category === 'SALARY' || category === 'LABOUR')
   const empPool = category === 'SALARY' ? fixedEmps : variableEmps
 
@@ -189,6 +190,18 @@ export default function AdvancePaymentForm() {
         })
         break
 
+      case 'BANK_TO_MILL':
+        addTransaction({
+          date, amount: amt,
+          description: description || 'Bank expense',
+          type: TRANSACTION_TYPES.BANK_TO_MILL,
+          ownerId: null, partnerId: null,
+          category: category || 'EXPENDITURE',
+          employeeId: employeeId || null,
+          paymentMode: 'ONLINE',
+        })
+        break
+
       default: break
     }
 
@@ -197,25 +210,26 @@ export default function AdvancePaymentForm() {
   }
 
   // Flow preview
-  const fromLabel = (mode === 'BANK_TO_CASH' || mode === 'BANK_TO_P') ? 'Bank'
+  const fromLabel = (mode === 'BANK_TO_CASH' || mode === 'BANK_TO_P' || mode === 'BANK_TO_MILL') ? 'Bank'
     : (mode === 'CASH_TO_BANK' || mode === 'CASH_TO_P') ? 'Cash'
     : mode === 'MILL_TO_P' ? 'Mill'
     : partner ? partner.name.split(' ')[0] : 'Partner'
 
   const toLabel = mode === 'BANK_TO_CASH' ? 'Cash'
     : mode === 'CASH_TO_BANK' ? 'Bank'
+    : mode === 'BANK_TO_MILL' ? 'Mill → Expense'
     : mode === 'P_TO_CASH' ? 'Cash'
     : mode === 'P_TO_BANK' ? 'Bank'
     : mode === 'P_TO_RM'   ? 'Mill → Expense'
     : partner ? partner.name.split(' ')[0] : 'Partner'
 
   const fromColor = (mode === 'MILL_TO_P' || mode === 'CASH_TO_P' || mode === 'CASH_TO_BANK') ? '#D97706'
-    : (mode === 'BANK_TO_P' || mode === 'BANK_TO_CASH') ? '#3B82F6'
+    : (mode === 'BANK_TO_P' || mode === 'BANK_TO_CASH' || mode === 'BANK_TO_MILL') ? '#3B82F6'
     : partner?.color || '#7C3AED'
 
   const toColor = (mode === 'P_TO_CASH' || mode === 'BANK_TO_CASH') ? '#D97706'
     : (mode === 'P_TO_BANK' || mode === 'CASH_TO_BANK') ? '#3B82F6'
-    : mode === 'P_TO_RM'   ? '#059669'
+    : (mode === 'P_TO_RM' || mode === 'BANK_TO_MILL') ? '#EF4444'
     : partner?.color || '#7C3AED'
 
   return (

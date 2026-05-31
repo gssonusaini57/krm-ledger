@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Config document — only the known app can read/write
+    match /config/{docId} {
+      allow read, write: if true;
+    }
+
+    // Transactions collection
+    match /transactions/{txnId} {
+      allow read, write: if true;
+    }
+  }
+}
